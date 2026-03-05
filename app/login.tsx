@@ -14,6 +14,9 @@ import { useRouter } from 'expo-router';
 
 import { User } from './auth-context';
 
+import { auth } from '../firebaseConfig';
+import { signInWithEmailAndPassword } from "firebase/auth";
+
 type Props = {
   onLogin?: (user?: User) => void;
   onNavigate?: (route: string) => void;
@@ -29,9 +32,35 @@ export default function Login({ onLogin, onNavigate }: Props) {
     router.push(route);
   };
 
-  const handleLogin = () => {
-    if (onLogin) return onLogin();
-    alert('Iniciar sesión (simulado)');
+  const handleLogin = async () => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        user,
+        password
+      );
+
+      const loggedUser = userCredential.user;
+
+      console.log("Usuario logueado:", loggedUser.email);
+
+      if (onLogin) {
+        onLogin({
+          id: loggedUser.uid,
+          name: loggedUser.email ?? "",
+          email: loggedUser.email ?? "",
+          phone: "",
+          type: "cliente",
+          avatar: undefined,
+          rating: 0
+        });
+      } else {
+        router.replace("/home");
+      }
+
+    } catch (error: any) {
+      alert("Error al iniciar sesión: " + error.message);
+    }
   };
 
   const demoClient = {
@@ -96,11 +125,20 @@ export default function Login({ onLogin, onNavigate }: Props) {
           <Text style={styles.or}>O iniciar con</Text>
 
           <View style={styles.socialRow}>
-            <TouchableOpacity style={[styles.socialBtn, styles.google]} onPress={() => alert('Google (simulado)')}>
+            <TouchableOpacity
+              style={[styles.socialBtn, styles.google]}
+              onPress={() => alert('Google login aún no implementado')}
+            >
               <Text style={styles.socialText}>Google</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.socialBtn, styles.facebook]} onPress={() => alert('Facebook (simulado)')}>
-              <Text style={[styles.socialText, { color: '#fff' }]}>Facebook</Text>
+
+            <TouchableOpacity
+              style={[styles.socialBtn, styles.facebook]}
+              onPress={() => alert('Facebook login aún no implementado')}
+            >
+              <Text style={[styles.socialText, { color: '#fff' }]}>
+                Facebook
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -112,20 +150,31 @@ export default function Login({ onLogin, onNavigate }: Props) {
           </View>
 
           <View style={{ marginTop: 12 }}>
-            <Text style={{ textAlign: 'center', color: '#6b7280' }}>Accesos de prueba</Text>
+            <Text style={{ textAlign: 'center', color: '#6b7280' }}>
+              Accesos de prueba
+            </Text>
+
             <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 }}>
               <Pressable
                 style={[styles.socialBtn, { backgroundColor: '#f3f4f6' }]}
-                onPress={() => (onLogin ? onLogin(demoClient) : handleLogin())}>
-                <Text style={{ color: '#111', fontWeight: '600' }}>Cliente demo</Text>
+                onPress={() => (onLogin ? onLogin(demoClient) : handleLogin())}
+              >
+                <Text style={{ color: '#111', fontWeight: '600' }}>
+                  Cliente demo
+                </Text>
               </Pressable>
+
               <Pressable
                 style={[styles.socialBtn, { backgroundColor: '#f3f4f6' }]}
-                onPress={() => (onLogin ? onLogin(demoProf) : handleLogin())}>
-                <Text style={{ color: '#111', fontWeight: '600' }}>Profes. demo</Text>
+                onPress={() => (onLogin ? onLogin(demoProf) : handleLogin())}
+              >
+                <Text style={{ color: '#111', fontWeight: '600' }}>
+                  Profes. demo
+                </Text>
               </Pressable>
             </View>
           </View>
+
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -134,10 +183,15 @@ export default function Login({ onLogin, onNavigate }: Props) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f6f8fb' },
+
   container: { flex: 1, padding: 20, justifyContent: 'center' },
+
   brand: { alignItems: 'center', marginBottom: 20 },
+
   brandTitle: { fontSize: 28, fontWeight: '700', color: '#0b5fff' },
+
   brandSubtitle: { color: '#6b7280', marginTop: 4 },
+
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -147,7 +201,9 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
+
   heading: { fontSize: 20, fontWeight: '600', marginBottom: 12 },
+
   input: {
     height: 48,
     borderWidth: 1,
@@ -157,6 +213,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: '#111827',
   },
+
   primaryButton: {
     height: 48,
     backgroundColor: '#0b5fff',
@@ -165,9 +222,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 4,
   },
+
   primaryButtonText: { color: '#fff', fontWeight: '600' },
+
   or: { textAlign: 'center', marginVertical: 12, color: '#6b7280' },
+
   socialRow: { flexDirection: 'row', justifyContent: 'space-between' },
+
   socialBtn: {
     flex: 1,
     height: 44,
@@ -176,10 +237,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginHorizontal: 6,
   },
+
   google: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e6e9ef' },
+
   facebook: { backgroundColor: '#1877f2' },
+
   socialText: { color: '#111', fontWeight: '600' },
+
   row: { flexDirection: 'row', justifyContent: 'center', marginTop: 14 },
+
   small: { color: '#6b7280' },
+
   link: { color: '#0b5fff', fontWeight: '600' },
 });
