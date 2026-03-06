@@ -5,13 +5,14 @@ import React, { useEffect, useState } from 'react';
 import { Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext, User } from './auth-context';
+import ForgotPassword from './forgot-password';
 import Login from './login';
 import Register from './register';
 
 export default function RootLayout() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authView, setAuthView] = useState<'login' | 'register'>('login');
+  const [authView, setAuthView] = useState<'login' | 'register' | 'forgot-password'>('login');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [viewUser, setViewUserState] = useState<User | null>(null);
 
@@ -19,6 +20,7 @@ export default function RootLayout() {
   const handleNavigate = (route: string) => {
     if (route === '/register') return setAuthView('register');
     if (route === '/login') return setAuthView('login');
+    if (route === '/forgot-password') return setAuthView('forgot-password');
     router.push(route);
   };
 
@@ -69,8 +71,10 @@ export default function RootLayout() {
         <View style={[styles.container, { justifyContent: 'center' }]}>
           {authView === 'login' ? (
             <Login onLogin={(u) => handleLogin(u)} onNavigate={handleNavigate} />
-          ) : (
+          ) : authView === 'register' ? (
             <Register onRegisterSuccess={() => setAuthView('login')} onNavigate={handleNavigate} />
+          ) : (
+            <ForgotPassword onNavigate={handleNavigate} />
           )}
         </View>
       </>
