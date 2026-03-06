@@ -1,21 +1,21 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  Pressable,
-  Platform,
   KeyboardAvoidingView,
+  Platform,
+  Pressable,
   ScrollView,
+  StyleSheet,
   Switch,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 
-import { auth, db } from '../firebaseConfig';
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { auth, db } from '../firebaseConfig';
 
 type Props = {
   onRegisterSuccess?: () => void;
@@ -67,9 +67,9 @@ export default function Register({ onRegisterSuccess, onNavigate }: Props) {
         credential: professionista ? credential : null,
         yearsExp: professionista ? Number(yearsExp) : null,
         rating: 0,
+        avatar: null, // 👈 agregar esto
         createdAt: serverTimestamp()
       });
-
       alert("Cuenta creada correctamente");
 
       if (onRegisterSuccess) {

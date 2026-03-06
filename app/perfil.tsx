@@ -4,8 +4,9 @@ import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput
 import { AuthContext } from './auth-context';
 
 import * as ImagePicker from 'expo-image-picker';
+import { doc, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { storage } from '../firebaseConfig';
+import { db, storage } from '../firebaseConfig';
 
 export default function Perfil() {
 
@@ -37,44 +38,55 @@ export default function Perfil() {
     ? { uri: displayed.avatar }
     : null;
 
-  const pickImage = async () => {
+const pickImage = async () => {
 
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (!permission.granted) {
-      Alert.alert("Permiso requerido", "Se necesita permiso para acceder a las fotos.");
-      return;
+  if (!permission.granted) {
+    Alert.alert("Permiso requerido", "Se necesita permiso para acceder a las fotos.");
+    return;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    quality: 0.7
+  });
+
+  if (!result.canceled) {
+
+    try {
+
+      const response = await fetch(result.assets[0].uri);
+      const blob = await response.blob();
+
+      const filename = `avatars/${user.id}.jpg`;
+
+      const storageRef = ref(storage, filename);
+
+      await uploadBytes(storageRef, blob);
+
+      const url = await getDownloadURL(storageRef);
+
+      // 🔥 GUARDAR EN FIRESTORE
+      await updateDoc(doc(db, "usuarios", user.id), {
+        avatar: url
+      });
+
+      // actualizar estado local
+      setUser({ ...user, avatar: url });
+
+      Alert.alert("Foto actualizada");
+
+    } catch (error) {
+
+      console.log(error);
+      Alert.alert("Error", "No se pudo subir la imagen.");
+
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7
-    });
+  }
 
-    if (!result.canceled) {
-
-      try {
-
-        const response = await fetch(result.assets[0].uri);
-        const blob = await response.blob();
-
-        const filename = `avatars/${Date.now()}.jpg`;
-
-        const storageRef = ref(storage, filename);
-
-        await uploadBytes(storageRef, blob);
-
-        const url = await getDownloadURL(storageRef);
-
-        setUser(user ? { ...user, avatar: url } : user);
-
-      } catch (error) {
-
-        Alert.alert("Error", "No se pudo subir la imagen.");
-
-      }
-    }
-  };
+};
 
   return (
     <>
