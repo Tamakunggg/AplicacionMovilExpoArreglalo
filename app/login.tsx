@@ -1,21 +1,24 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  Pressable,
-  Platform,
   KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
   TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 
 import { User } from './auth-context';
 
-import { auth } from '../firebaseConfig';
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from '../firebaseConfig';
+
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebaseConfig";
 
 type Props = {
   onLogin?: (user?: User) => void;
@@ -32,36 +35,51 @@ export default function Login({ onLogin, onNavigate }: Props) {
     router.push(route);
   };
 
-  const handleLogin = async () => {
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        user,
-        password
-      );
+const handleLogin = async () => {
+  try {
 
-      const loggedUser = userCredential.user;
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      user,
+      password
+    );
 
-      console.log("Usuario logueado:", loggedUser.email);
+    const firebaseUser = userCredential.user;
 
-      if (onLogin) {
-        onLogin({
-          id: loggedUser.uid,
-          name: loggedUser.email ?? "",
-          email: loggedUser.email ?? "",
-          phone: "",
-          type: "cliente",
-          avatar: undefined,
-          rating: 0
-        });
-      } else {
-        router.replace("/home");
-      }
+    console.log("Usuario logueado:", firebaseUser.email);
 
-    } catch (error: any) {
-      alert("Error al iniciar sesión: " + error.message);
+    // 🔹 Buscar datos en Firestore
+    const userRef = doc(db, "usuarios", firebaseUser.uid);
+    const userSnap = await getDoc(userRef);
+
+    let userData = {};
+
+    if (userSnap.exists()) {
+      userData = userSnap.data();
+      console.log("Datos Firestore:", userData);
     }
-  };
+
+    if (onLogin) {
+      onLogin({
+        id: firebaseUser.uid,
+        name: userData.name || "",
+        email: firebaseUser.email ?? "",
+        phone: userData.phone || "",
+        type: userData.type || "cliente",
+        avatar: userData.avatar || undefined,
+        specialty: userData.specialty || undefined,
+        credential: userData.credential || undefined,
+        yearsExp: userData.yearsExp || undefined,
+        rating: userData.rating || 0
+      });
+    } else {
+      router.replace("/home");
+    }
+
+  } catch (error: any) {
+    alert("Error al iniciar sesión: " + error.message);
+  }
+};
 
   const demoClient = {
     id: 'u-client',
