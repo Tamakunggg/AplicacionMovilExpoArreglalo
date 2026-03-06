@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import * as NavigationBar from 'expo-navigation-bar';
 import { Slot, useRouter } from 'expo-router';
-import { View, Text, StyleSheet, Pressable, Animated, Platform, AppState } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
+import { Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AuthContext, User } from './auth-context';
 import Login from './login';
 import Register from './register';
-import { AuthContext, User } from './auth-context';
-import * as NavigationBar from 'expo-navigation-bar';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -15,39 +15,6 @@ export default function RootLayout() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [viewUser, setViewUserState] = useState<User | null>(null);
 
-  const demoClient: User = {
-    id: 'u-client',
-    name: 'Cliente Demo',
-    email: 'cliente@demo.com',
-    phone: '55 5555 5555',
-    type: 'cliente',
-    avatar: undefined,
-    rating: 4.6,
-    reviews: [
-      { id: 'r1', author: 'Profesional A', rating: 5, comment: 'Excelente cliente, pagó a tiempo.' },
-      { id: 'r2', author: 'Profesional B', rating: 4, comment: 'Buena comunicación y puntualidad.' },
-    ],
-  };
-
-  const demoProf: User = {
-    id: 'u-prof',
-    name: 'Profesionista Demo',
-    email: 'prof@demo.com',
-    phone: '66 6666 6666',
-    type: 'profesionista',
-    avatar: undefined,
-    specialty: 'Electricista',
-    credential: 'CED-123456',
-    yearsExp: '8',
-    rating: 4.9,
-    reviews: [
-      { id: 'r1', author: 'Cliente X', rating: 5, comment: 'Trabajo impecable y muy puntual.' },
-      { id: 'r2', author: 'Cliente Y', rating: 4, comment: 'Buen trabajo, pero tardó un poco.' },
-      { id: 'r3', author: 'Cliente Z', rating: 5, comment: 'Recomendado, muy profesional.' },
-      { id: 'r4', author: 'Cliente W', rating: 4, comment: 'Buen resultado, precio justo.' },
-      { id: 'r5', author: 'Cliente V', rating: 5, comment: 'Excelente servicio y atención.' },
-    ],
-  };
 
   const handleNavigate = (route: string) => {
     if (route === '/register') return setAuthView('register');
@@ -56,7 +23,7 @@ export default function RootLayout() {
   };
 
   const handleLogin = (user?: User) => {
-    setCurrentUser(user ?? demoClient);
+    setCurrentUser(user ?? null);
     setIsLoggedIn(true);
   };
 

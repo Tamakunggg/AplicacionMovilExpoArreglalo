@@ -13,9 +13,23 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Picker } from '@react-native-picker/picker';
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from '../firebaseConfig';
+const PROFESSIONS = [
+  "Electricista",
+  "Plomero",
+  "Carpintero",
+  "Jardinero",
+  "Pintor",
+  "Cerrajero",
+  "Soldador",
+  "Yesero",
+  "Albañil",
+  "Técnico en audio",
+  "Fontanero"
+];
 
 type Props = {
   onRegisterSuccess?: () => void;
@@ -45,6 +59,11 @@ export default function Register({ onRegisterSuccess, onNavigate }: Props) {
 
     if (password !== confirm) {
       alert("Las contraseñas no coinciden");
+      return;
+    }
+    
+    if (professionista && !professionTitle) {
+      alert("Selecciona una profesión");
       return;
     }
 
@@ -145,12 +164,20 @@ export default function Register({ onRegisterSuccess, onNavigate }: Props) {
             {professionista && (
               <View style={styles.professionBlock}>
 
-                <Text style={styles.label}>Especialidad</Text>
-                <TextInput
-                  style={styles.input}
-                  value={professionTitle}
-                  onChangeText={setProfessionTitle}
-                />
+                <Text style={styles.label}>Profesión</Text>
+
+<View style={styles.pickerContainer}>
+  <Picker
+    selectedValue={professionTitle}
+    onValueChange={(itemValue) => setProfessionTitle(itemValue)}
+    style={styles.picker}
+  >
+    <Picker.Item label="Selecciona una profesión..." value="" />
+    {PROFESSIONS.map((p) => (
+      <Picker.Item key={p} label={p} value={p} />
+    ))}
+  </Picker>
+</View>
 
                 <Text style={styles.label}>Credencial / Registro</Text>
                 <TextInput
@@ -290,6 +317,21 @@ const styles = StyleSheet.create({
   link: {
     color: '#0b5fff',
     fontWeight: '600'
-  }
+  },
+pickerContainer: {
+  height: 44,
+  borderWidth: 1,
+  borderColor: '#e6e9ef',
+  borderRadius: 8,
+  justifyContent: 'center',
+  paddingHorizontal: 10,
+  overflow: 'hidden'
+},
+
+picker: {
+  height: 50,
+  width: '100%',
+  marginTop: -6
+}
 
 });

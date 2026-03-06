@@ -1,21 +1,32 @@
-import React, { useMemo, useState, useContext } from 'react';
+import ProfessionChips from '@/components/profession-chips';
+import { useRouter } from 'expo-router';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
   FlatList,
-  Pressable,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ProfessionChips from '@/components/profession-chips';
 import { AuthContext } from './auth-context';
-import { useRouter } from 'expo-router';
 
-type Item = { id: string; name: string; profession: string; rating: number; location?: string; avatar?: any; distance?: number };
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../firebaseConfig";
+
+type Item = {
+  id: string;
+  name: string;
+  profession: string;
+  rating: number;
+  location?: string;
+  avatar?: any;
+  distance?: number;
+};
 
 const PROFESSIONS = [
   'Electricista',
@@ -33,34 +44,80 @@ const PROFESSIONS = [
 
 const AVATAR = require('../assets/images/icon.png');
 
-const SAMPLE: Item[] = [
-  { id: '1', name: 'Juan Pérez', profession: 'Electricista', rating: 4.9, location: 'Culiacán', avatar: AVATAR, distance: 3 },
-  { id: '2', name: 'Ana López', profession: 'Plomero', rating: 4.7, location: 'Culiacán', avatar: AVATAR, distance: 6 },
-  { id: '3', name: 'Carlos Ruiz', profession: 'Electricista', rating: 4.5, location: 'Los Mochis', avatar: AVATAR, distance: 120 },
-  { id: '4', name: 'María Gómez', profession: 'Carpintero', rating: 4.8, location: 'Culiacán', avatar: AVATAR, distance: 8 },
-  { id: '5', name: 'Luis Díaz', profession: 'Jardinero', rating: 4.6, location: 'Mazatlán', avatar: AVATAR, distance: 220 },
-  { id: '6', name: 'Pedro Castillo', profession: 'Pintor', rating: 4.4, location: 'Culiacán', avatar: AVATAR, distance: 12 },
-  { id: '7', name: 'Rosa Martínez', profession: 'Soldador', rating: 4.5, location: 'Culiacán', avatar: AVATAR, distance: 4 },
-  { id: '8', name: 'Diego Fernández', profession: 'Yesero', rating: 4.3, location: 'Mazatlán', avatar: AVATAR, distance: 210 },
-  { id: '9', name: 'Marcos Torres', profession: 'Albañil', rating: 4.6, location: 'Culiacán', avatar: AVATAR, distance: 7 },
-  { id: '10', name: 'Sofía Ramírez', profession: 'Técnico en audio', rating: 4.8, location: 'Los Mochis', avatar: AVATAR, distance: 115 },
-];
-
 export default function Buscar() {
+
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [maxDistance, setMaxDistance] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<'rating' | 'distance' | null>('rating');
+
+  const [profesionistas, setProfesionistas] = useState<Item[]>([]);
+
   const { setViewUser } = useContext(AuthContext);
   const router = useRouter();
 
+  // 🔥 Cargar datos desde Firebase
+  useEffect(() => {
+
+    const cargarProfesionales = async () => {
+
+      try {
+
+        const querySnapshot = await getDocs(collection(db, "usuarios"));
+
+        const lista: Item[] = [];
+
+        querySnapshot.forEach((doc) => {
+
+          const data = doc.data();
+
+          if (data.type === "profesionista") {
+
+            lista.push({
+              id: doc.id,
+              name: data.name,
+              profession: data.specialty,
+              rating: data.rating || 0,
+              location: "Culiacán",
+              avatar: data.avatar || null,
+              distance: Math.floor(Math.random() * 25) + 1
+            });
+
+          }
+
+        });
+
+        setProfesionistas(lista);
+
+      } catch (error) {
+        console.log("Error cargando profesionistas:", error);
+      }
+
+    };
+
+    cargarProfesionales();
+
+  }, []);
+
+
   const results = useMemo(() => {
+
     const q = query.trim().toLowerCase();
-    let out = SAMPLE.filter((s) => {
+
+    let out = profesionistas.filter((s) => {
+
       if (selected && s.profession !== selected) return false;
+
       if (maxDistance !== null && typeof s.distance === 'number' && s.distance > maxDistance) return false;
+
       if (!q) return true;
-      return s.name.toLowerCase().includes(q) || s.profession.toLowerCase().includes(q) || (s.location || '').toLowerCase().includes(q);
+
+      return (
+        s.name.toLowerCase().includes(q) ||
+        s.profession.toLowerCase().includes(q) ||
+        (s.location || '').toLowerCase().includes(q)
+      );
+
     });
 
     if (sortBy === 'rating') {
@@ -70,7 +127,9 @@ export default function Buscar() {
     }
 
     return out;
-  }, [selected, query, maxDistance, sortBy]);
+
+  }, [profesionistas, selected, query, maxDistance, sortBy]);
+
 
   const ICONS: Record<string, string> = {
     'Electricista': 'flash-outline',
@@ -89,8 +148,10 @@ export default function Buscar() {
   return (
     <SafeAreaView style={styles.safe} edges={["top","bottom"]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+
         <View style={styles.header}>
           <Text style={styles.title}>Contratar profesionales</Text>
+
           <TextInput
             placeholder="Buscar por nombre, profesión o ubicación"
             placeholderTextColor="#999"
@@ -103,66 +164,62 @@ export default function Buscar() {
 
         <ProfessionChips items={PROFESSIONS} selected={selected} onSelect={setSelected} icons={ICONS} />
 
-        <View style={{ flexDirection: 'row', paddingHorizontal: 12, marginTop: 8, alignItems: 'center' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
-            <Text style={{ marginRight: 8, color: '#374151' }}>Distancia</Text>
-            <Pressable onPress={() => setMaxDistance(prev => prev === 10 ? null : 10)} style={[styles.filterBtn, maxDistance === 10 ? styles.filterBtnActive : null]}>
-              <Text style={maxDistance === 10 ? styles.filterTextActive : styles.filterText}>10 km</Text>
-            </Pressable>
-            <Pressable onPress={() => setMaxDistance(prev => prev === 25 ? null : 25)} style={[styles.filterBtn, maxDistance === 25 ? styles.filterBtnActive : null]}>
-              <Text style={maxDistance === 25 ? styles.filterTextActive : styles.filterText}>25 km</Text>
-            </Pressable>
-            <Pressable onPress={() => setMaxDistance(null)} style={[styles.filterBtn, maxDistance === null ? styles.filterBtnActive : null]}>
-              <Text style={maxDistance === null ? styles.filterTextActive : styles.filterText}>Todos</Text>
-            </Pressable>
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 'auto' }}>
-            <Text style={{ marginRight: 8, color: '#374151' }}>Ordenar</Text>
-            <Pressable onPress={() => setSortBy(prev => prev === 'rating' ? null : 'rating')} style={[styles.filterBtn, sortBy === 'rating' ? styles.filterBtnActive : null]}>
-              <Text style={sortBy === 'rating' ? styles.filterTextActive : styles.filterText}>Calificación</Text>
-            </Pressable>
-            <Pressable onPress={() => setSortBy(prev => prev === 'distance' ? null : 'distance')} style={[styles.filterBtn, sortBy === 'distance' ? styles.filterBtnActive : null]}>
-              <Text style={sortBy === 'distance' ? styles.filterTextActive : styles.filterText}>Distancia</Text>
-            </Pressable>
-          </View>
-        </View>
-
         <FlatList
           data={results}
           keyExtractor={(i) => i.id}
           style={styles.list}
           contentContainerStyle={{ paddingBottom: 140 }}
           ListEmptyComponent={<Text style={styles.empty}>No se encontraron resultados</Text>}
+
           renderItem={({ item }) => (
+
             <Pressable
               style={styles.card}
               onPress={() => {
-                    setViewUser && setViewUser({
-                      id: item.id,
-                      name: item.name,
-                      type: 'profesionista',
-                      specialty: item.profession,
-                      rating: item.rating,
-                      avatar: item.avatar,
-                      reviews: [],
-                    });
-                    router.push('/perfil');
-                  }}
+
+                setViewUser && setViewUser({
+                  id: item.id,
+                  name: item.name,
+                  type: 'profesionista',
+                  specialty: item.profession,
+                  rating: item.rating,
+                  avatar: item.avatar,
+                  reviews: [],
+                });
+
+                router.push('/perfil');
+
+              }}
             >
+
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Image source={item.avatar} style={styles.avatar} />
+
+                  <Image
+                    source={
+                      item.avatar
+                        ? { uri: item.avatar }
+                        : AVATAR
+                    }
+                    style={styles.avatar}
+                  />
                 <View style={{ marginLeft: 12 }}>
                   <Text style={styles.name}>{item.name}</Text>
-                  <Text style={styles.meta}>{item.profession} · {item.location} {item.distance ? `· ${item.distance} km` : ''}</Text>
+                  <Text style={styles.meta}>
+                    {item.profession} · {item.location} {item.distance ? `· ${item.distance} km` : ''}
+                  </Text>
                 </View>
+
               </View>
+
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={styles.rating}>{item.rating.toFixed(1)}★</Text>
               </View>
+
             </Pressable>
+
           )}
         />
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -181,8 +238,4 @@ const styles = StyleSheet.create({
   meta: { color: '#6b7280', marginTop: 4 },
   rating: { color: '#0b5fff', fontWeight: '700' },
   empty: { textAlign: 'center', marginTop: 20, color: '#6b7280' },
-  filterBtn: { paddingHorizontal: 8, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#e6e9ef', marginRight: 8, backgroundColor: '#fff' },
-  filterBtnActive: { backgroundColor: '#0b5fff', borderColor: '#0b5fff' },
-  filterText: { color: '#374151', fontWeight: '600' },
-  filterTextActive: { color: '#fff', fontWeight: '700' },
 });

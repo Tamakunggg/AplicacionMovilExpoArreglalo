@@ -81,28 +81,7 @@ const handleLogin = async () => {
   }
 };
 
-  const demoClient = {
-    id: 'u-client',
-    name: 'Cliente Demo',
-    email: 'cliente@demo.com',
-    phone: '55 5555 5555',
-    type: 'cliente' as const,
-    avatar: undefined,
-    rating: 4.6,
-  };
 
-  const demoProf = {
-    id: 'u-prof',
-    name: 'Profesionista Demo',
-    email: 'prof@demo.com',
-    phone: '66 6666 6666',
-    type: 'profesionista' as const,
-    specialty: 'Electricista',
-    credential: 'CED-123456',
-    yearsExp: '8',
-    avatar: undefined,
-    rating: 4.9,
-  };
 
   return (
     <SafeAreaView edges={["top","bottom"]} style={styles.safe}>
@@ -166,33 +145,6 @@ const handleLogin = async () => {
               <Text style={styles.link}> Regístrate</Text>
             </Pressable>
           </View>
-
-          <View style={{ marginTop: 12 }}>
-            <Text style={{ textAlign: 'center', color: '#6b7280' }}>
-              Accesos de prueba
-            </Text>
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 }}>
-              <Pressable
-                style={[styles.socialBtn, { backgroundColor: '#f3f4f6' }]}
-                onPress={() => (onLogin ? onLogin(demoClient) : handleLogin())}
-              >
-                <Text style={{ color: '#111', fontWeight: '600' }}>
-                  Cliente demo
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={[styles.socialBtn, { backgroundColor: '#f3f4f6' }]}
-                onPress={() => (onLogin ? onLogin(demoProf) : handleLogin())}
-              >
-                <Text style={{ color: '#111', fontWeight: '600' }}>
-                  Profes. demo
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
