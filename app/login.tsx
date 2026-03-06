@@ -119,6 +119,12 @@ const handleLogin = async () => {
             <Text style={styles.primaryButtonText}>Ingresar</Text>
           </Pressable>
 
+          <Pressable onPress={() => handleNavigate('/forgot-password')}>
+            <Text style={[styles.link, { textAlign: 'center', marginTop: 12 }]}>
+              ¿Olvidaste tu contraseña?
+            </Text>
+          </Pressable>
+
           <Text style={styles.or}>O iniciar con</Text>
 
           <View style={styles.socialRow}>
