@@ -1,7 +1,9 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -22,7 +24,6 @@ type Item = {
   profession: string;
   rating: number;
   avatar?: any;
-  // Campos extra necesarios para el nuevo PerfilProfesionista
   bio?: string;
   categories?: string[];
   yearsExp?: string;
@@ -31,7 +32,6 @@ type Item = {
 };
 
 const AVATAR = require('../assets/images/icon.png');
-
 let favoritesCache: Item[] | null = null;
 
 export default function Favoritos() {
@@ -63,7 +63,6 @@ export default function Favoritos() {
         return;
       }
 
-      // Traer perfiles con todos sus campos
       const usersQuery = query(
         collection(db, "usuarios"),
         where("__name__", "in", ids.slice(0, 30))
@@ -79,7 +78,6 @@ export default function Favoritos() {
           profession: data.specialty || 'General',
           rating: data.rating || 0,
           avatar: data.avatar || null,
-          // Mapeamos los campos extra para el perfil
           bio: data.bio || '',
           categories: data.categories || [],
           yearsExp: data.yearsExp || 'N/A',
@@ -99,9 +97,7 @@ export default function Favoritos() {
   }, []);
 
   useEffect(() => {
-    if (!favoritesCache) {
-      loadFavorites();
-    }
+    if (!favoritesCache) loadFavorites();
   }, [loadFavorites]);
 
   const onRefresh = () => {
@@ -114,6 +110,7 @@ export default function Favoritos() {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
 
+      // Optimistic update
       const updatedList = favorites.filter(f => f.id !== profId);
       setFavorites(updatedList);
       favoritesCache = updatedList;
@@ -129,27 +126,15 @@ export default function Favoritos() {
       await Promise.all(deletePromises);
 
     } catch (error) {
-      console.log("Error al eliminar:", error);
+      Alert.alert("Error", "No se pudo quitar de favoritos");
       loadFavorites();
     }
   };
 
-  const openProfile = (item: Item) => {
-    // Pasamos el item completo (que ahora incluye bio, categories, etc.)
-    setViewUser?.({
-      ...item,
-      type: 'profesionista', 
-      specialty: item.profession,
-      reviews: [], 
-    });
-
-    router.push('/perfil');
-  };
-
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.container}>
-        <Text style={styles.title}>Favoritos</Text>
+        <Text style={styles.title}>Mis Favoritos</Text>
 
         {loading ? (
           <ActivityIndicator size="large" color="#0b5fff" style={{ marginTop: 20 }} />
@@ -160,39 +145,65 @@ export default function Favoritos() {
             contentContainerStyle={favorites.length === 0 ? styles.emptyListContent : styles.listContent}
             style={styles.list}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0b5fff']} tintColor={'#0b5fff'} />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0b5fff']} />
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.empty}>Aún no tienes favoritos</Text>
-                <Text style={styles.subEmpty}>Desliza hacia abajo para actualizar</Text>
+                <MaterialCommunityIcons name="heart-outline" size={80} color="#cbd5e1" />
+                <Text style={styles.empty}>Tu lista está vacía</Text>
+                <Text style={styles.subEmpty}>Guarda a los profesionales que más te gusten para tenerlos a mano.</Text>
               </View>
             }
             renderItem={({ item }) => (
-              <Pressable style={styles.cardRow} onPress={() => openProfile(item)}>
-                <View style={styles.infoContainer}>
+              <Pressable 
+                style={styles.card} 
+                onPress={() => {
+                  setViewUser?.({ ...item, type: 'profesionista' });
+                  router.push('/perfil');
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1 }}>
                   <Image 
                     source={item.avatar ? { uri: item.avatar } : AVATAR} 
                     style={styles.avatar} 
                   />
                   <View style={{ marginLeft: 12, flex: 1 }}>
-                    <Text style={styles.name}>{item.name}</Text>
-                    <Text style={styles.meta}>{item.profession}</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+                      <View style={styles.ratingBadge}>
+                        <Text style={styles.ratingText}>{Number(item.rating).toFixed(1)} ★</Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.specialtyText}>{item.profession}</Text>
+
+                    {/* Chips de categorías para mantener consistencia */}
+                    <View style={styles.categoriesContainer}>
+                      {item.categories && item.categories.length > 0 ? (
+                        item.categories.slice(0, 2).map((cat, index) => (
+                          <View key={index} style={styles.categoryBadge}>
+                            <Text style={styles.categoryText}>{cat}</Text>
+                          </View>
+                        ))
+                      ) : null}
+                    </View>
+
+                    <View style={styles.locationRow}>
+                      <Text style={styles.metaText}>📍 {item.location}</Text>
+                    </View>
                   </View>
                 </View>
 
-                <View style={styles.actionsContainer}>
-                  <Text style={styles.rating}>{item.rating.toFixed(1)}★</Text>
-                  <Pressable 
-                    style={[styles.smallBtn, { backgroundColor: '#ef4444' }]} 
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      removeFavorite(item.id);
-                    }}
-                  >
-                    <Text style={styles.smallBtnText}>Quitar</Text>
-                  </Pressable>
-                </View>
+                {/* Botón de eliminar con icono para que sea más limpio */}
+                <Pressable 
+                  style={styles.removeIconBtn} 
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    removeFavorite(item.id);
+                  }}
+                >
+                  <MaterialCommunityIcons name="heart-remove" size={24} color="#ef4444" />
+                </Pressable>
               </Pressable>
             )}
           />
@@ -203,42 +214,57 @@ export default function Favoritos() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f6f8fb' },
-  container: { paddingHorizontal: 16, paddingTop: 16, flex: 1 },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 16 },
+  safe: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1 },
+  title: { fontSize: 24, fontWeight: '800', marginHorizontal: 16, marginTop: 16, marginBottom: 16, color: '#0f172a' },
   list: { flex: 1 },
-  listContent: { paddingBottom: 20 },
+  listContent: { paddingBottom: 100 },
   emptyListContent: { flexGrow: 1, justifyContent: 'center' },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center' },
-  empty: { color: '#6b7280', fontSize: 16, fontWeight: '600' },
-  subEmpty: { color: '#9ca3af', fontSize: 14, marginTop: 8 },
-  cardRow: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    elevation: 2,
+  emptyContainer: { alignItems: 'center', padding: 40 },
+  empty: { color: '#64748b', fontSize: 18, fontWeight: '700', marginTop: 16 },
+  subEmpty: { color: '#94a3b8', fontSize: 14, marginTop: 8, textAlign: 'center', lineHeight: 20 },
+  
+  card: { 
+    backgroundColor: '#fff', 
+    padding: 16, 
+    borderRadius: 16, 
+    marginHorizontal: 16, 
+    marginBottom: 14, 
+    flexDirection: 'row', 
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
   },
-  infoContainer: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  actionsContainer: { width: 100, alignItems: 'flex-end' },
-  avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#e6eefc' },
-  name: { fontWeight: '700', fontSize: 16 },
-  meta: { color: '#6b7280', fontSize: 13, marginTop: 2 },
-  rating: { color: '#0b5fff', fontWeight: '700', marginBottom: 4 },
-  smallBtn: {
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    width: '100%',
-    alignItems: 'center'
+  avatar: { width: 64, height: 64, borderRadius: 14, backgroundColor: '#f1f5f9' },
+  name: { fontWeight: '700', fontSize: 17, color: '#1e293b', flex: 1, marginRight: 8 },
+  
+  ratingBadge: {
+    backgroundColor: '#fffbeb',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
   },
-  smallBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  ratingText: { color: '#d97706', fontWeight: '800', fontSize: 13 },
+  
+  specialtyText: { color: '#0b5fff', fontSize: 13, fontWeight: '700', marginTop: 2 },
+  
+  categoriesContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, gap: 6 },
+  categoryBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  categoryText: { fontSize: 11, color: '#475569', fontWeight: '600' },
+  
+  locationRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center' },
+  metaText: { color: '#64748b', fontSize: 12, fontWeight: '500' },
+  
+  removeIconBtn: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    padding: 8,
+    backgroundColor: '#fff5f5',
+    borderRadius: 12,
+  }
 });

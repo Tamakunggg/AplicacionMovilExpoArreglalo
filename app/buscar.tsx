@@ -1,5 +1,6 @@
 import ProfessionChips from '@/components/profession-chips';
 import { useRouter } from 'expo-router';
+import { collection, query as firestoreQuery, getDocs, where } from "firebase/firestore";
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,12 +16,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { db } from "../firebaseConfig";
 import { AuthContext } from './auth-context';
 
-import { collection, query as firestoreQuery, getDocs, where } from "firebase/firestore";
-import { db } from "../firebaseConfig";
-
-// Actualizamos el tipo para incluir los campos que el perfil necesita mostrar
 type Item = {
   id: string;
   name: string;
@@ -29,7 +27,6 @@ type Item = {
   location?: string;
   avatar?: any;
   distance?: number;
-  // Campos adicionales para el perfil detallado
   bio?: string;
   categories?: string[];
   yearsExp?: string;
@@ -44,7 +41,6 @@ const PROFESSIONS = [
 ];
 
 const AVATAR = require('../assets/images/icon.png');
-
 let searchCache: Item[] | null = null;
 
 export default function Buscar() {
@@ -62,16 +58,13 @@ export default function Buscar() {
 
   const cargarProfesionales = useCallback(async (isRefreshing = false) => {
     if (!isRefreshing && !searchCache) setLoading(true);
-
     try {
       const q = firestoreQuery(collection(db, "usuarios"), where("type", "==", "profesionista"));
       const querySnapshot = await getDocs(q);
 
       const lista: Item[] = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        // Construimos el nombre completo si vienen separados
         const calculatedName = data.name || (data.firstName ? `${data.firstName} ${data.lastName}` : 'Usuario');
-        
         return {
           id: doc.id,
           name: calculatedName,
@@ -82,7 +75,6 @@ export default function Buscar() {
           location: data.location || "Culiacán",
           avatar: data.avatar || null,
           distance: Math.floor(Math.random() * 25) + 1,
-          // Extraemos los datos necesarios para el perfil detallado
           bio: data.bio || '',
           categories: data.categories || [],
           yearsExp: data.yearsExp || 'N/A',
@@ -101,9 +93,7 @@ export default function Buscar() {
   }, []);
 
   useEffect(() => {
-    if (!searchCache) {
-      cargarProfesionales();
-    }
+    if (!searchCache) cargarProfesionales();
   }, [cargarProfesionales]);
 
   const onRefresh = () => {
@@ -111,6 +101,7 @@ export default function Buscar() {
     cargarProfesionales(true);
   };
 
+  // BUSQUEDA INTELIGENTE: Filtra por Nombre, Especialidad y Array de Categorías (Oficios)
   const results = useMemo(() => {
     const q = searchInput.trim().toLowerCase();
     let out = profesionistas.filter((s) => {
@@ -118,10 +109,14 @@ export default function Buscar() {
       if (maxDistance !== null && s.distance && s.distance > maxDistance) return false;
       if (!q) return true;
 
+      // Verifica si el texto buscado está en el array de categorías
+      const matchesCategory = s.categories?.some(cat => cat.toLowerCase().includes(q));
+
       return (
         s.name.toLowerCase().includes(q) ||
         s.profession.toLowerCase().includes(q) ||
-        (s.location || '').toLowerCase().includes(q)
+        (s.location || '').toLowerCase().includes(q) ||
+        matchesCategory
       );
     });
 
@@ -147,7 +142,7 @@ export default function Buscar() {
         <View style={styles.header}>
           <Text style={styles.title}>Contratar profesionales</Text>
           <TextInput
-            placeholder="Buscar por nombre, profesión o ubicación"
+            placeholder="Buscar por nombre, oficio o especialidad..."
             placeholderTextColor="#999"
             style={styles.search}
             value={searchInput}
@@ -172,35 +167,51 @@ export default function Buscar() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Text style={styles.empty}>No se encontraron resultados</Text>
-                <Text style={styles.subEmpty}>Desliza hacia abajo para actualizar</Text>
+                <Text style={styles.subEmpty}>Prueba con otra palabra o desliza para actualizar</Text>
               </View>
             }
             renderItem={({ item }) => (
               <Pressable
                 style={styles.card}
                 onPress={() => {
-                  // Enviamos el objeto 'item' que ya contiene todos los campos descargados
-                  setViewUser?.({
-                    ...item,
-                    type: 'profesionista', // Aseguramos que el Perfil.tsx sepa qué renderizar
-                  });
+                  setViewUser?.({ ...item, type: 'profesionista' });
                   router.push('/perfil');
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1 }}>
                   <Image
                     source={item.avatar ? { uri: item.avatar } : AVATAR}
                     style={styles.avatar}
                   />
                   <View style={{ marginLeft: 12, flex: 1 }}>
-                    <Text style={styles.name}>{item.name}</Text>
-                    <Text style={styles.meta} numberOfLines={1}>
-                      {item.profession} · {item.location} {item.distance ? `· ${item.distance} km` : ''}
-                    </Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+                      <View style={styles.ratingBadge}>
+                        <Text style={styles.ratingText}>{item.rating.toFixed(1)} ★</Text>
+                      </View>
+                    </View>
+                    
+                    <Text style={styles.specialtyText}>{item.profession}</Text>
+
+                    <View style={styles.categoriesContainer}>
+                      {item.categories && item.categories.length > 0 ? (
+                        item.categories.slice(0, 3).map((cat, index) => (
+                          <View key={index} style={styles.categoryBadge}>
+                            <Text style={styles.categoryText}>{cat}</Text>
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={styles.metaText}>General</Text>
+                      )}
+                      {item.categories && item.categories.length > 3 && (
+                        <Text style={styles.moreCategories}>+{item.categories.length - 3}</Text>
+                      )}
+                    </View>
+
+                    <View style={styles.locationRow}>
+                      <Text style={styles.metaText}>📍 {item.location} {item.distance ? `· ${item.distance} km` : ''}</Text>
+                    </View>
                   </View>
-                </View>
-                <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
-                  <Text style={styles.rating}>{item.rating.toFixed(1)}★</Text>
                 </View>
               </Pressable>
             )}
@@ -212,33 +223,95 @@ export default function Buscar() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f6f8fb' },
+  safe: { flex: 1, backgroundColor: '#f8fafc' },
   container: { flex: 1 },
   header: { padding: 16 },
-  title: { fontSize: 22, fontWeight: '700', marginBottom: 12 },
-  search: { backgroundColor: '#fff', borderRadius: 10, height: 48, paddingHorizontal: 16, borderWidth: 1, borderColor: '#e6e9ef', fontSize: 15 },
+  title: { fontSize: 24, fontWeight: '800', marginBottom: 14, color: '#0f172a' },
+  search: { 
+    backgroundColor: '#fff', 
+    borderRadius: 12, 
+    height: 52, 
+    paddingHorizontal: 16, 
+    borderWidth: 1, 
+    borderColor: '#e2e8f0', 
+    fontSize: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10
+  },
   list: { flex: 1 },
   emptyList: { flexGrow: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyContainer: { alignItems: 'center' },
-  empty: { fontSize: 16, fontWeight: '600', color: '#6b7280' },
-  subEmpty: { fontSize: 14, color: '#9ca3af', marginTop: 4 },
+  emptyContainer: { alignItems: 'center', padding: 20 },
+  empty: { fontSize: 16, fontWeight: '700', color: '#64748b' },
+  subEmpty: { fontSize: 14, color: '#94a3b8', marginTop: 4, textAlign: 'center' },
   card: { 
     backgroundColor: '#fff', 
-    padding: 14, 
-    borderRadius: 12, 
+    padding: 16, 
+    borderRadius: 16, 
     marginHorizontal: 16, 
-    marginBottom: 12, 
+    marginBottom: 14, 
     flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    elevation: 2,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
   },
-  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#e6eefc' },
-  name: { fontWeight: '700', fontSize: 16 },
-  meta: { color: '#6b7280', marginTop: 4, fontSize: 13 },
-  rating: { color: '#0b5fff', fontWeight: '700', fontSize: 15 },
+  avatar: { width: 64, height: 64, borderRadius: 14, backgroundColor: '#f1f5f9' },
+  name: { fontWeight: '700', fontSize: 17, color: '#1e293b', flex: 1, marginRight: 8 },
+  
+  ratingBadge: {
+    backgroundColor: '#fffbeb',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+  },
+  ratingText: {
+    color: '#d97706', 
+    fontWeight: '800',
+    fontSize: 13,
+  },
+
+  specialtyText: {
+    color: '#0b5fff',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  categoriesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    gap: 6,
+    alignItems: 'center'
+  },
+  categoryBadge: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  categoryText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  moreCategories: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontWeight: '700',
+  },
+  locationRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metaText: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '500',
+  },
 });

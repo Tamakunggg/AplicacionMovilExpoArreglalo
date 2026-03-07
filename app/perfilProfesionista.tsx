@@ -194,36 +194,58 @@ export default function PerfilProfesionista({ displayed, isViewingOther }: Perfi
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Sobre mí</Text>
-          <Text style={styles.sectionText}>{displayed.bio || 'Sin descripción disponible.'}</Text>
-
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Experiencia</Text>
-              <Text style={styles.statValue}>{displayed.yearsExp || '0'} años</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Calificación</Text>
-              <Text style={styles.statValue}>{displayed.rating ? `${displayed.rating.toFixed(1)} ★` : '—'}</Text>
-            </View>
-          </View>
-
-          <View style={{ marginTop: 30 }}>
-            {isViewingOther ? (
-              <Pressable 
-                style={[styles.primaryBtn, { backgroundColor: '#0b5fff', height: 56 }]} 
-                onPress={() => setHireModalVisible(true)}
-              >
-                <Text style={styles.primaryText}>Contratar ahora</Text>
-              </Pressable>
-            ) : (
-              <Pressable style={styles.logoutBtn} onPress={logout}>
-                <Text style={styles.logoutText}>Cerrar sesión</Text>
-              </Pressable>
-            )}
-          </View>
+<View style={styles.card}>
+  {/* NUEVA SECCIÓN: Oficios y Servicios */}
+  <Text style={styles.sectionTitle}>Oficios y Servicios</Text>
+  <View style={styles.tagRow}>
+    {displayed.categories && displayed.categories.length > 0 ? (
+      displayed.categories.map((cat, i) => (
+        <View key={i} style={styles.profileTag}>
+          <Text style={styles.profileTagText}>{cat}</Text>
         </View>
+      ))
+    ) : (
+      <Text style={styles.sectionText}>Sin oficios registrados.</Text>
+    )}
+  </View>
+
+  {/* NUEVA SECCIÓN: Especialidad */}
+  <Text style={styles.sectionTitle}>Especialidad</Text>
+  <Text style={styles.sectionText}>{displayed.specialty || 'General'}</Text>
+
+  {/* Sección: Sobre mí */}
+  <Text style={styles.sectionTitle}>Sobre mí</Text>
+  <Text style={styles.sectionText}>{displayed.bio || 'Sin descripción disponible.'}</Text>
+
+  <View style={styles.statsRow}>
+    <View style={styles.statItem}>
+      <Text style={styles.statLabel}>Experiencia</Text>
+      <Text style={styles.statValue}>{displayed.yearsExp || '0'} años</Text>
+    </View>
+    <View style={styles.statItem}>
+      <Text style={styles.statLabel}>Calificación</Text>
+      <Text style={styles.statValue}>
+        {displayed.rating ? `${Number(displayed.rating).toFixed(1)} ★` : '—'}
+      </Text>
+    </View>
+  </View>
+
+  {/* ... resto de los botones de abajo ... */}
+  <View style={{ marginTop: 30 }}>
+    {isViewingOther ? (
+      <Pressable 
+        style={[styles.primaryBtn, { backgroundColor: '#0b5fff', height: 56 }]} 
+        onPress={() => setHireModalVisible(true)}
+      >
+        <Text style={styles.primaryText}>Contratar ahora</Text>
+      </Pressable>
+    ) : (
+      <Pressable style={styles.logoutBtn} onPress={logout}>
+        <Text style={styles.logoutText}>Cerrar sesión</Text>
+      </Pressable>
+    )}
+  </View>
+</View>
       </ScrollView>
     </>
   );
