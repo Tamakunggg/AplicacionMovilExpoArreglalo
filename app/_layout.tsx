@@ -1,9 +1,11 @@
 import * as NavigationBar from 'expo-navigation-bar';
 import { Slot, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from 'react';
-import { Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { db } from "../firebaseConfig";
 import { AuthContext, User } from './auth-context';
 import ForgotPassword from './forgot-password';
 import Login from './login';
@@ -15,7 +17,7 @@ export default function RootLayout() {
   const [authView, setAuthView] = useState<'login' | 'register' | 'forgot-password'>('login');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [viewUser, setViewUserState] = useState<User | null>(null);
-
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
   const handleNavigate = (route: string) => {
     if (route === '/register') return setAuthView('register');
@@ -24,9 +26,53 @@ export default function RootLayout() {
     router.push(route);
   };
 
-  const handleLogin = (user?: User) => {
-    setCurrentUser(user ?? null);
-    setIsLoggedIn(true);
+  // FUNCIÓN MEJORADA: Ahora busca el documento en Firestore antes de entrar
+  const handleLogin = async (userAuth?: User) => {
+    if (!userAuth || !userAuth.id) {
+      setCurrentUser(null);
+      setIsLoggedIn(false);
+      return;
+    }
+
+    setIsLoadingProfile(true);
+    try {
+      // 1. Referencia al documento del usuario
+      const userDocRef = doc(db, "usuarios", userAuth.id);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const dbData = userDocSnap.data();
+        
+        // 2. Construimos el usuario "full" con los datos de la base de datos
+        const fullUserData: User = {
+          ...userAuth, // Mantiene ID y Email del login
+          name: dbData.name || (dbData.firstName ? `${dbData.firstName} ${dbData.lastName}` : userAuth.name),
+          firstName: dbData.firstName,
+          lastName: dbData.lastName,
+          type: dbData.type,
+          specialty: dbData.specialty,
+          bio: dbData.bio,
+          yearsExp: dbData.yearsExp,
+          rating: dbData.rating || 0,
+          avatar: dbData.avatar,
+          location: dbData.location,
+          categories: dbData.categories || [],
+          phone: dbData.phone
+        };
+
+        setCurrentUser(fullUserData);
+      } else {
+        // Si no hay doc en Firestore, usamos los datos básicos
+        setCurrentUser(userAuth);
+      }
+      setIsLoggedIn(true);
+    } catch (error) {
+      console.error("Error al cargar perfil tras login:", error);
+      setCurrentUser(userAuth);
+      setIsLoggedIn(true);
+    } finally {
+      setIsLoadingProfile(false);
+    }
   };
 
   const [activeTab, setActiveTab] = useState<'buscar' | 'favoritos' | 'perfil' | 'trabajos'>('buscar');
@@ -37,11 +83,10 @@ export default function RootLayout() {
       if (!mounted) return;
       try {
         if (Platform.OS === 'android' && NavigationBar && NavigationBar.setVisibilityAsync) {
-          // Hide the navigation bar; don't set behavior to avoid edge-to-edge warnings
           await NavigationBar.setVisibilityAsync('hidden');
         }
       } catch (e) {
-        // ignore on unsupported platforms or older devices
+        // ignore
       }
     };
 
@@ -64,12 +109,15 @@ export default function RootLayout() {
     }
   }, [isLoggedIn]);
 
+  // Pantalla de Auth (Login/Registro)
   if (!isLoggedIn) {
     return (
       <>
         <StatusBar style="light" backgroundColor="#0b5fff" />
         <View style={[styles.container, { justifyContent: 'center' }]}>
-          {authView === 'login' ? (
+          {isLoadingProfile ? (
+            <ActivityIndicator size="large" color="#0b5fff" />
+          ) : authView === 'login' ? (
             <Login onLogin={(u) => handleLogin(u)} onNavigate={handleNavigate} />
           ) : authView === 'register' ? (
             <Register onRegisterSuccess={() => setAuthView('login')} onNavigate={handleNavigate} />
@@ -81,10 +129,17 @@ export default function RootLayout() {
     );
   }
 
-  
-
+  // Pantalla Principal (App)
   return (
-    <AuthContext.Provider value={{ logout: () => { setIsLoggedIn(false); setCurrentUser(null); }, user: currentUser, setUser: setCurrentUser, viewUser, setViewUser: (u?: User | null) => { setViewUserState(u ?? null); } }}>
+    <AuthContext.Provider 
+      value={{ 
+        logout: () => { setIsLoggedIn(false); setCurrentUser(null); }, 
+        user: currentUser, 
+        setUser: setCurrentUser, 
+        viewUser, 
+        setViewUser: (u?: User | null) => { setViewUserState(u ?? null); } 
+      }}
+    >
       <View style={styles.container}>
         <StatusBar style="light" backgroundColor="#0b5fff" />
         <SafeAreaView edges={["top"]} style={styles.contentSafe}>
@@ -95,7 +150,6 @@ export default function RootLayout() {
         <SafeAreaView edges={["bottom"]} style={styles.navSafeArea} pointerEvents="box-none">
           <View style={styles.navWrapper} pointerEvents="box-none">
             <View style={styles.nav}>
-              {/* NavButton provides press animation and active color */}
               <NavButton label="Contratar" route="/buscar" active={activeTab === 'buscar'} onPress={() => { router.push('/buscar'); setActiveTab('buscar'); }} />
               <NavButton label="Trabajos" route="/trabajos" active={activeTab === 'trabajos'} onPress={() => { router.push('/trabajos'); setActiveTab('trabajos'); }} />
               <NavButton label="Favoritos" route="/favoritos" active={activeTab === 'favoritos'} onPress={() => { router.push('/favoritos'); setActiveTab('favoritos'); }} />
@@ -108,7 +162,7 @@ export default function RootLayout() {
   );
 }
 
-function NavButton({ label, onPress, active, route }: { label: string; onPress: () => void; active?: boolean; route?: string }) {
+function NavButton({ label, onPress, active }: { label: string; onPress: () => void; active?: boolean; route?: string }) {
   const scale = React.useRef(new Animated.Value(1)).current;
 
   const onPressIn = () => {

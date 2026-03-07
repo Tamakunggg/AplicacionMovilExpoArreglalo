@@ -1,12 +1,14 @@
 import ProfessionChips from '@/components/profession-chips';
 import { useRouter } from 'expo-router';
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -15,9 +17,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from './auth-context';
 
-import { collection, getDocs } from "firebase/firestore";
+import { collection, query as firestoreQuery, getDocs, where } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
+// Actualizamos el tipo para incluir los campos que el perfil necesita mostrar
 type Item = {
   id: string;
   name: string;
@@ -26,90 +29,93 @@ type Item = {
   location?: string;
   avatar?: any;
   distance?: number;
+  // Campos adicionales para el perfil detallado
+  bio?: string;
+  categories?: string[];
+  yearsExp?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
 };
 
 const PROFESSIONS = [
-  'Electricista',
-  'Plomero',
-  'Carpintero',
-  'Jardinero',
-  'Pintor',
-  'Cerrajero',
-  'Soldador',
-  'Yesero',
-  'Albañil',
-  'Técnico en audio',
-  'Fontanero',
+  'Electricista', 'Plomero', 'Carpintero', 'Jardinero', 'Pintor',
+  'Cerrajero', 'Soldador', 'Yesero', 'Albañil', 'Técnico en audio', 'Fontanero',
 ];
 
 const AVATAR = require('../assets/images/icon.png');
 
+let searchCache: Item[] | null = null;
+
 export default function Buscar() {
-
   const [selected, setSelected] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const [maxDistance, setMaxDistance] = useState<number | null>(null);
-  const [sortBy, setSortBy] = useState<'rating' | 'distance' | null>('rating');
+  const [searchInput, setSearchInput] = useState('');
+  const [maxDistance] = useState<number | null>(null);
+  const [sortBy] = useState<'rating' | 'distance' | null>('rating');
 
-  const [profesionistas, setProfesionistas] = useState<Item[]>([]);
+  const [profesionistas, setProfesionistas] = useState<Item[]>(searchCache || []);
+  const [loading, setLoading] = useState(!searchCache);
+  const [refreshing, setRefreshing] = useState(false);
 
   const { setViewUser } = useContext(AuthContext);
   const router = useRouter();
 
-  // 🔥 Cargar datos desde Firebase
-  useEffect(() => {
+  const cargarProfesionales = useCallback(async (isRefreshing = false) => {
+    if (!isRefreshing && !searchCache) setLoading(true);
 
-    const cargarProfesionales = async () => {
+    try {
+      const q = firestoreQuery(collection(db, "usuarios"), where("type", "==", "profesionista"));
+      const querySnapshot = await getDocs(q);
 
-      try {
+      const lista: Item[] = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        // Construimos el nombre completo si vienen separados
+        const calculatedName = data.name || (data.firstName ? `${data.firstName} ${data.lastName}` : 'Usuario');
+        
+        return {
+          id: doc.id,
+          name: calculatedName,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          profession: data.specialty || 'General',
+          rating: data.rating || 0,
+          location: data.location || "Culiacán",
+          avatar: data.avatar || null,
+          distance: Math.floor(Math.random() * 25) + 1,
+          // Extraemos los datos necesarios para el perfil detallado
+          bio: data.bio || '',
+          categories: data.categories || [],
+          yearsExp: data.yearsExp || 'N/A',
+          email: data.email || '',
+        };
+      });
 
-        const querySnapshot = await getDocs(collection(db, "usuarios"));
-
-        const lista: Item[] = [];
-
-        querySnapshot.forEach((doc) => {
-
-          const data = doc.data();
-
-          if (data.type === "profesionista") {
-
-            lista.push({
-              id: doc.id,
-              name: data.name,
-              profession: data.specialty,
-              rating: data.rating || 0,
-              location: "Culiacán",
-              avatar: data.avatar || null,
-              distance: Math.floor(Math.random() * 25) + 1
-            });
-
-          }
-
-        });
-
-        setProfesionistas(lista);
-
-      } catch (error) {
-        console.log("Error cargando profesionistas:", error);
-      }
-
-    };
-
-    cargarProfesionales();
-
+      setProfesionistas(lista);
+      searchCache = lista;
+    } catch (error) {
+      console.log("Error cargando profesionistas:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
+  useEffect(() => {
+    if (!searchCache) {
+      cargarProfesionales();
+    }
+  }, [cargarProfesionales]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    cargarProfesionales(true);
+  };
 
   const results = useMemo(() => {
-
-    const q = query.trim().toLowerCase();
-
+    const q = searchInput.trim().toLowerCase();
     let out = profesionistas.filter((s) => {
-
       if (selected && s.profession !== selected) return false;
-
-      if (maxDistance !== null && typeof s.distance === 'number' && s.distance > maxDistance) return false;
-
+      if (maxDistance !== null && s.distance && s.distance > maxDistance) return false;
       if (!q) return true;
 
       return (
@@ -117,7 +123,6 @@ export default function Buscar() {
         s.profession.toLowerCase().includes(q) ||
         (s.location || '').toLowerCase().includes(q)
       );
-
     });
 
     if (sortBy === 'rating') {
@@ -125,101 +130,82 @@ export default function Buscar() {
     } else if (sortBy === 'distance') {
       out = out.sort((a, b) => (a.distance || 0) - (b.distance || 0));
     }
-
     return out;
-
-  }, [profesionistas, selected, query, maxDistance, sortBy]);
-
+  }, [profesionistas, selected, searchInput, maxDistance, sortBy]);
 
   const ICONS: Record<string, string> = {
-    'Electricista': 'flash-outline',
-    'Plomero': 'pipe-wrench',
-    'Carpintero': 'hammer',
-    'Jardinero': 'leaf',
-    'Pintor': 'brush',
-    'Cerrajero': 'key-variant',
-    'Soldador': 'fire',
-    'Yesero': 'tools',
-    'Albañil': 'domain',
-    'Técnico en audio': 'music',
-    'Fontanero': 'pipe',
+    'Electricista': 'flash-outline', 'Plomero': 'pipe-wrench', 'Carpintero': 'hammer',
+    'Jardinero': 'leaf', 'Pintor': 'brush', 'Cerrajero': 'key-variant',
+    'Soldador': 'fire', 'Yesero': 'tools', 'Albañil': 'domain',
+    'Técnico en audio': 'music', 'Fontanero': 'pipe',
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top","bottom"]}>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-
+        
         <View style={styles.header}>
           <Text style={styles.title}>Contratar profesionales</Text>
-
           <TextInput
             placeholder="Buscar por nombre, profesión o ubicación"
             placeholderTextColor="#999"
             style={styles.search}
-            value={query}
-            onChangeText={setQuery}
+            value={searchInput}
+            onChangeText={setSearchInput}
             returnKeyType="search"
           />
         </View>
 
         <ProfessionChips items={PROFESSIONS} selected={selected} onSelect={setSelected} icons={ICONS} />
 
-        <FlatList
-          data={results}
-          keyExtractor={(i) => i.id}
-          style={styles.list}
-          contentContainerStyle={{ paddingBottom: 140 }}
-          ListEmptyComponent={<Text style={styles.empty}>No se encontraron resultados</Text>}
-
-          renderItem={({ item }) => (
-
-            <Pressable
-              style={styles.card}
-              onPress={() => {
-
-                setViewUser && setViewUser({
-                  id: item.id,
-                  name: item.name,
-                  type: 'profesionista',
-                  specialty: item.profession,
-                  rating: item.rating,
-                  avatar: item.avatar,
-                  reviews: [],
-                });
-
-                router.push('/perfil');
-
-              }}
-            >
-
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
+        {loading ? (
+          <ActivityIndicator size="large" color="#0b5fff" style={{ marginTop: 20 }} />
+        ) : (
+          <FlatList
+            data={results}
+            keyExtractor={(i) => i.id}
+            style={styles.list}
+            contentContainerStyle={results.length === 0 ? styles.emptyList : { paddingBottom: 140 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0b5fff']} tintColor="#0b5fff" />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.empty}>No se encontraron resultados</Text>
+                <Text style={styles.subEmpty}>Desliza hacia abajo para actualizar</Text>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <Pressable
+                style={styles.card}
+                onPress={() => {
+                  // Enviamos el objeto 'item' que ya contiene todos los campos descargados
+                  setViewUser?.({
+                    ...item,
+                    type: 'profesionista', // Aseguramos que el Perfil.tsx sepa qué renderizar
+                  });
+                  router.push('/perfil');
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                   <Image
-                    source={
-                      item.avatar
-                        ? { uri: item.avatar }
-                        : AVATAR
-                    }
+                    source={item.avatar ? { uri: item.avatar } : AVATAR}
                     style={styles.avatar}
                   />
-                <View style={{ marginLeft: 12 }}>
-                  <Text style={styles.name}>{item.name}</Text>
-                  <Text style={styles.meta}>
-                    {item.profession} · {item.location} {item.distance ? `· ${item.distance} km` : ''}
-                  </Text>
+                  <View style={{ marginLeft: 12, flex: 1 }}>
+                    <Text style={styles.name}>{item.name}</Text>
+                    <Text style={styles.meta} numberOfLines={1}>
+                      {item.profession} · {item.location} {item.distance ? `· ${item.distance} km` : ''}
+                    </Text>
+                  </View>
                 </View>
-
-              </View>
-
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.rating}>{item.rating.toFixed(1)}★</Text>
-              </View>
-
-            </Pressable>
-
-          )}
-        />
-
+                <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                  <Text style={styles.rating}>{item.rating.toFixed(1)}★</Text>
+                </View>
+              </Pressable>
+            )}
+          />
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -229,13 +215,30 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f6f8fb' },
   container: { flex: 1 },
   header: { padding: 16 },
-  title: { fontSize: 20, fontWeight: '700', marginBottom: 8 },
-  search: { backgroundColor: '#fff', borderRadius: 8, height: 44, paddingHorizontal: 12, borderWidth: 1, borderColor: '#e6e9ef' },
-  list: { paddingHorizontal: 12, paddingTop: 8 },
-  card: { backgroundColor: '#fff', padding: 12, borderRadius: 10, marginBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', elevation: 1 },
+  title: { fontSize: 22, fontWeight: '700', marginBottom: 12 },
+  search: { backgroundColor: '#fff', borderRadius: 10, height: 48, paddingHorizontal: 16, borderWidth: 1, borderColor: '#e6e9ef', fontSize: 15 },
+  list: { flex: 1 },
+  emptyList: { flexGrow: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyContainer: { alignItems: 'center' },
+  empty: { fontSize: 16, fontWeight: '600', color: '#6b7280' },
+  subEmpty: { fontSize: 14, color: '#9ca3af', marginTop: 4 },
+  card: { 
+    backgroundColor: '#fff', 
+    padding: 14, 
+    borderRadius: 12, 
+    marginHorizontal: 16, 
+    marginBottom: 12, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#e6eefc' },
-  name: { fontWeight: '700' },
-  meta: { color: '#6b7280', marginTop: 4 },
-  rating: { color: '#0b5fff', fontWeight: '700' },
-  empty: { textAlign: 'center', marginTop: 20, color: '#6b7280' },
+  name: { fontWeight: '700', fontSize: 16 },
+  meta: { color: '#6b7280', marginTop: 4, fontSize: 13 },
+  rating: { color: '#0b5fff', fontWeight: '700', fontSize: 15 },
 });

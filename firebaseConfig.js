@@ -1,9 +1,12 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-// 1. Importamos las herramientas necesarias para la persistencia
 import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+import { initializeApp } from "firebase/app";
 import { getAuth, getReactNativePersistence, initializeAuth } from "firebase/auth";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
+} from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -14,22 +17,29 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID
 };
 
-// Inicializamos la App de Firebase
+// 1. Inicializar la App de Firebase
 const app = initializeApp(firebaseConfig);
 
-// 2. Configuramos Auth con persistencia en AsyncStorage
-// Usamos una variable 'auth' que se inicializa solo si no existe ya
+// 2. Configurar Firestore con Caché Offline Persistente
+// Sustituimos getFirestore por initializeFirestore
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager() 
+  })
+});
+
+// 3. Inicializar Storage
+export const storage = getStorage(app);
+
+// 4. Configurar Auth con persistencia en AsyncStorage
 let auth;
 try {
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(ReactNativeAsyncStorage),
   });
-} catch (error) {
-  // Si ya estaba inicializado, simplemente lo obtenemos
+} catch (e) {
+  // Por si se intenta re-inicializar en Fast Refresh
   auth = getAuth(app);
 }
 
-// Exportamos las instancias
-export const storage = getStorage(app);
-export const db = getFirestore(app);
 export { auth };
