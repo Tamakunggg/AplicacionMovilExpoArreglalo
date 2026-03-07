@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import { addDoc, collection, deleteDoc, doc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useContext, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, View } from 'react-native';
+import { Button, Text } from 'react-native-paper';
 import { auth, db, storage } from '../firebaseConfig';
 import { styles } from '../styles';
 import { AuthContext } from './auth-context';
@@ -233,16 +234,21 @@ export default function PerfilProfesionista({ displayed, isViewingOther }: Perfi
   {/* ... resto de los botones de abajo ... */}
   <View style={{ marginTop: 30 }}>
     {isViewingOther ? (
-      <Pressable 
-        style={[styles.primaryBtn, { backgroundColor: '#0b5fff', height: 56 }]} 
+      <Button 
+        mode="contained" 
         onPress={() => setHireModalVisible(true)}
+        style={{ paddingVertical: 8 }}
       >
-        <Text style={styles.primaryText}>Contratar ahora</Text>
-      </Pressable>
+        Contratar ahora
+      </Button>
     ) : (
-      <Pressable style={styles.logoutBtn} onPress={logout}>
-        <Text style={styles.logoutText}>Cerrar sesión</Text>
-      </Pressable>
+      <Button 
+        mode="contained" 
+        onPress={logout}
+        buttonColor="#ef4444"
+      >
+        Cerrar sesión
+      </Button>
     )}
   </View>
 </View>

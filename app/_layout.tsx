@@ -1,10 +1,14 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as NavigationBar from 'expo-navigation-bar';
 import { Slot, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, AppState, Platform, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { PaperProvider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppDrawer from '../components/AppDrawer';
+import { darkTheme, lightTheme } from '../constants/paperTheme';
 import { db } from "../firebaseConfig";
 import { AuthContext, User } from './auth-context';
 import ForgotPassword from './forgot-password';
@@ -13,11 +17,14 @@ import Register from './register';
 
 export default function RootLayout() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? darkTheme : lightTheme;
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register' | 'forgot-password'>('login');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [viewUser, setViewUserState] = useState<User | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [drawerVisible, setDrawerVisible] = useState(false);
 
   const handleNavigate = (route: string) => {
     if (route === '/register') return setAuthView('register');
@@ -112,53 +119,145 @@ export default function RootLayout() {
   // Pantalla de Auth (Login/Registro)
   if (!isLoggedIn) {
     return (
-      <>
-        <StatusBar style="light" backgroundColor="#0b5fff" />
-        <View style={[styles.container, { justifyContent: 'center' }]}>
-          {isLoadingProfile ? (
-            <ActivityIndicator size="large" color="#0b5fff" />
-          ) : authView === 'login' ? (
-            <Login onLogin={(u) => handleLogin(u)} onNavigate={handleNavigate} />
-          ) : authView === 'register' ? (
-            <Register onRegisterSuccess={() => setAuthView('login')} onNavigate={handleNavigate} />
-          ) : (
-            <ForgotPassword onNavigate={handleNavigate} />
-          )}
-        </View>
-      </>
+      <PaperProvider theme={theme}>
+        <>
+          <StatusBar style="light" backgroundColor="#0b5fff" />
+          <View style={[styles.container, { justifyContent: 'center' }]}>
+            {isLoadingProfile ? (
+              <ActivityIndicator size="large" color="#0b5fff" />
+            ) : authView === 'login' ? (
+              <Login onLogin={(u) => handleLogin(u)} onNavigate={handleNavigate} />
+            ) : authView === 'register' ? (
+              <Register onRegisterSuccess={() => setAuthView('login')} onNavigate={handleNavigate} />
+            ) : (
+              <ForgotPassword onNavigate={handleNavigate} />
+            )}
+          </View>
+        </>
+      </PaperProvider>
     );
   }
 
   // Pantalla Principal (App)
   return (
-    <AuthContext.Provider 
-      value={{ 
-        logout: () => { setIsLoggedIn(false); setCurrentUser(null); }, 
-        user: currentUser, 
-        setUser: setCurrentUser, 
-        viewUser, 
-        setViewUser: (u?: User | null) => { setViewUserState(u ?? null); } 
-      }}
-    >
-      <View style={styles.container}>
-        <StatusBar style="light" backgroundColor="#0b5fff" />
-        <SafeAreaView edges={["top"]} style={styles.contentSafe}>
+    <PaperProvider theme={theme}>
+      <AuthContext.Provider 
+        value={{ 
+          logout: () => { setIsLoggedIn(false); setCurrentUser(null); }, 
+          user: currentUser, 
+          setUser: setCurrentUser, 
+          viewUser, 
+          setViewUser: (u?: User | null) => { setViewUserState(u ?? null); } 
+        }}
+      >
+        <View style={styles.container}>
+          <StatusBar style="light" backgroundColor="#0b5fff" />
+          
+          {/* Header con Hamburguesa y Logo */}
+          <SafeAreaView edges={["top"]} style={styles.headerSafe}>
+            <View style={styles.header}>
+              <Pressable
+                onPress={() => setDrawerVisible(true)}
+                style={({ pressed }) => [
+                  styles.hamburgerBtn,
+                  pressed && styles.hamburgerBtnPressed,
+                ]}
+              >
+                <MaterialCommunityIcons 
+                  name="menu" 
+                  size={24} 
+                  color="#0b5fff"
+                />
+              </Pressable>
+              
+              <View style={styles.logoContainer}>
+                <Text style={styles.logoText}>Arréglalo</Text>
+              </View>
+              
+              <View style={styles.headerSpace} />
+            </View>
+          </SafeAreaView>
+
+          {/* Content */}
           <View style={styles.content}>
             <Slot />
           </View>
-        </SafeAreaView>
-        <SafeAreaView edges={["bottom"]} style={styles.navSafeArea} pointerEvents="box-none">
-          <View style={styles.navWrapper} pointerEvents="box-none">
-            <View style={styles.nav}>
-              <NavButton label="Contratar" route="/buscar" active={activeTab === 'buscar'} onPress={() => { router.push('/buscar'); setActiveTab('buscar'); }} />
-              <NavButton label="Trabajos" route="/trabajos" active={activeTab === 'trabajos'} onPress={() => { router.push('/trabajos'); setActiveTab('trabajos'); }} />
-              <NavButton label="Favoritos" route="/favoritos" active={activeTab === 'favoritos'} onPress={() => { router.push('/favoritos'); setActiveTab('favoritos'); }} />
-              <NavButton label="Perfil" route="/perfil" active={activeTab === 'perfil'} onPress={() => { setViewUserState(null); router.push('/perfil'); setActiveTab('perfil'); }} />
+          
+          {/* Bottom Navigation */}
+          <SafeAreaView edges={["bottom"]} style={styles.navSafeArea} pointerEvents="box-none">
+            <View style={styles.navWrapper} pointerEvents="box-none">
+              <View style={styles.nav}>
+                <NavButton label="Contratar" route="/buscar" active={activeTab === 'buscar'} onPress={() => { router.push('/buscar'); setActiveTab('buscar'); }} />
+                <NavButton label="Trabajos" route="/trabajos" active={activeTab === 'trabajos'} onPress={() => { router.push('/trabajos'); setActiveTab('trabajos'); }} />
+                <NavButton label="Favoritos" route="/favoritos" active={activeTab === 'favoritos'} onPress={() => { router.push('/favoritos'); setActiveTab('favoritos'); }} />
+                <NavButton label="Perfil" route="/perfil" active={activeTab === 'perfil'} onPress={() => { setViewUserState(null); router.push('/perfil'); setActiveTab('perfil'); }} />
+              </View>
             </View>
-          </View>
-        </SafeAreaView>
-      </View>
-    </AuthContext.Provider>
+          </SafeAreaView>
+
+          {/* App Drawer */}
+          <AppDrawer
+            visible={drawerVisible}
+            onClose={() => setDrawerVisible(false)}
+            header={{
+              userName: currentUser?.name || currentUser?.firstName,
+              userEmail: currentUser?.email,
+              userType: currentUser?.type === 'client' ? 'Cliente' : 'Profesional',
+            }}
+            items={[
+              {
+                id: 'profile',
+                label: 'Mi Perfil',
+                icon: 'account-circle-outline',
+                onPress: () => {
+                  setViewUserState(null);
+                  router.push('/perfil');
+                },
+              },
+              {
+                id: 'settings',
+                label: 'Configuración',
+                icon: 'cog-outline',
+                onPress: () => {
+                  // Será implementado después
+                  console.log('Abrir Ajustes');
+                },
+              },
+              {
+                id: 'help',
+                label: 'Ayuda y Soporte',
+                icon: 'help-circle-outline',
+                onPress: () => {
+                  // Será implementado después
+                  console.log('Abrir Ayuda');
+                },
+              },
+              {
+                id: 'about',
+                label: 'Acerca de',
+                icon: 'information-outline',
+                onPress: () => {
+                  // Será implementado después
+                  console.log('Abrir Acerca de');
+                },
+              },
+            ]}
+            footerItems={[
+              {
+                id: 'logout',
+                label: 'Cerrar Sesión',
+                icon: 'logout',
+                danger: true,
+                onPress: () => {
+                  setIsLoggedIn(false);
+                  setCurrentUser(null);
+                },
+              },
+            ]}
+          />
+        </View>
+      </AuthContext.Provider>
+    </PaperProvider>
   );
 }
 
@@ -183,6 +282,40 @@ function NavButton({ label, onPress, active }: { label: string; onPress: () => v
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  headerSafe: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  hamburgerBtn: {
+    padding: 8,
+    borderRadius: 8,
+    flex: 1,
+  },
+  hamburgerBtnPressed: {
+    backgroundColor: '#f3f4f6',
+  },
+  logoContainer: {
+    flex: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0b5fff',
+    letterSpacing: 0.5,
+  },
+  headerSpace: {
+    flex: 1,
+  },
   content: { flex: 1 },
   navSafeArea: {
     backgroundColor: '#fff',

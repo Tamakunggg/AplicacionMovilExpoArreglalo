@@ -1,15 +1,12 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    View,
 } from 'react-native';
+import { Button, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { User } from './auth-context';
@@ -29,6 +26,7 @@ export default function Login({ onLogin, onNavigate }: Props) {
   const router = useRouter();
   const [user, setUser] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleNavigate = (route: string) => {
     if (onNavigate) return onNavigate(route);
@@ -36,6 +34,7 @@ export default function Login({ onLogin, onNavigate }: Props) {
   };
 
 const handleLogin = async () => {
+  setIsLoading(true);
   try {
 
     const userCredential = await signInWithEmailAndPassword(
@@ -78,10 +77,10 @@ const handleLogin = async () => {
 
   } catch (error: any) {
     alert("Error al iniciar sesión: " + error.message);
+  } finally {
+    setIsLoading(false);
   }
 };
-
-
 
   return (
     <SafeAreaView edges={["top","bottom"]} style={styles.safe}>
@@ -89,67 +88,87 @@ const handleLogin = async () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}>
         <View style={styles.brand}>
-          <Text style={styles.brandTitle}>Arreglalo</Text>
-          <Text style={styles.brandSubtitle}>Expertos al servicio</Text>
+          <Text variant="headlineLarge" style={{ fontWeight: '700', color: '#0b5fff' }}>
+            Arreglalo
+          </Text>
+          <Text variant="bodyMedium" style={{ marginTop: 4, color: '#6b7280' }}>
+            Expertos al servicio
+          </Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.heading}>Iniciar sesión</Text>
+          <Text variant="titleLarge" style={{ marginBottom: 20, fontWeight: '600' }}>
+            Iniciar sesión
+          </Text>
 
           <TextInput
-            placeholder="Usuario o correo"
-            placeholderTextColor="#999"
+            label="Usuario o correo"
             value={user}
             onChangeText={setUser}
-            style={styles.input}
             autoCapitalize="none"
             keyboardType="email-address"
+            mode="outlined"
+            style={styles.input}
           />
 
           <TextInput
-            placeholder="Contraseña"
-            placeholderTextColor="#999"
+            label="Contraseña"
             value={password}
             onChangeText={setPassword}
-            style={styles.input}
             secureTextEntry
+            mode="outlined"
+            style={styles.input}
           />
 
-          <Pressable style={styles.primaryButton} onPress={handleLogin}>
-            <Text style={styles.primaryButtonText}>Ingresar</Text>
-          </Pressable>
+          <Button 
+            mode="contained" 
+            onPress={handleLogin}
+            loading={isLoading}
+            disabled={isLoading}
+            style={styles.primaryButton}
+          >
+            Ingresar
+          </Button>
 
-          <Pressable onPress={() => handleNavigate('/forgot-password')}>
-            <Text style={[styles.link, { textAlign: 'center', marginTop: 12 }]}>
-              ¿Olvidaste tu contraseña?
-            </Text>
-          </Pressable>
+          <Button 
+            mode="text" 
+            onPress={() => handleNavigate('/forgot-password')}
+            style={{ marginTop: 12 }}
+          >
+            ¿Olvidaste tu contraseña?
+          </Button>
 
-          <Text style={styles.or}>O iniciar con</Text>
+          <Text variant="bodyMedium" style={styles.or}>O iniciar con</Text>
 
           <View style={styles.socialRow}>
-            <TouchableOpacity
-              style={[styles.socialBtn, styles.google]}
+            <Button
+              mode="outlined"
               onPress={() => alert('Google login aún no implementado')}
+              style={styles.socialBtn}
             >
-              <Text style={styles.socialText}>Google</Text>
-            </TouchableOpacity>
+              Google
+            </Button>
 
-            <TouchableOpacity
-              style={[styles.socialBtn, styles.facebook]}
+            <Button
+              mode="contained"
               onPress={() => alert('Facebook login aún no implementado')}
+              style={[styles.socialBtn, { backgroundColor: '#1877f2' }]}
             >
-              <Text style={[styles.socialText, { color: '#fff' }]}>
-                Facebook
-              </Text>
-            </TouchableOpacity>
+              Facebook
+            </Button>
           </View>
 
           <View style={styles.row}>
-            <Text style={styles.small}>¿No tienes cuenta?</Text>
-            <Pressable onPress={() => handleNavigate('/register')}>
-              <Text style={styles.link}> Regístrate</Text>
-            </Pressable>
+            <Text variant="bodySmall" style={{ color: '#6b7280' }}>
+              ¿No tienes cuenta?
+            </Text>
+            <Button 
+              mode="text" 
+              onPress={() => handleNavigate('/register')}
+              compact
+            >
+              Regístrate
+            </Button>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -164,10 +183,6 @@ const styles = StyleSheet.create({
 
   brand: { alignItems: 'center', marginBottom: 20 },
 
-  brandTitle: { fontSize: 28, fontWeight: '700', color: '#0b5fff' },
-
-  brandSubtitle: { color: '#6b7280', marginTop: 4 },
-
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -178,51 +193,22 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
 
-  heading: { fontSize: 20, fontWeight: '600', marginBottom: 12 },
-
   input: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#e6e9ef',
-    borderRadius: 8,
-    paddingHorizontal: 12,
     marginBottom: 12,
-    color: '#111827',
   },
 
   primaryButton: {
-    height: 48,
-    backgroundColor: '#0b5fff',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 4,
+    paddingVertical: 6,
   },
-
-  primaryButtonText: { color: '#fff', fontWeight: '600' },
 
   or: { textAlign: 'center', marginVertical: 12, color: '#6b7280' },
 
-  socialRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  socialRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
 
   socialBtn: {
     flex: 1,
-    height: 44,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 6,
   },
 
-  google: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e6e9ef' },
-
-  facebook: { backgroundColor: '#1877f2' },
-
-  socialText: { color: '#111', fontWeight: '600' },
-
-  row: { flexDirection: 'row', justifyContent: 'center', marginTop: 14 },
-
-  small: { color: '#6b7280' },
-
-  link: { color: '#0b5fff', fontWeight: '600' },
+  row: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 14 },
 });

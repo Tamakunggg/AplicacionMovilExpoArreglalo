@@ -4,16 +4,13 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    View,
 } from 'react-native';
+import { Button, Chip, Switch, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from '../firebaseConfig';
 
@@ -39,9 +36,8 @@ export default function Register({ onRegisterSuccess, onNavigate }: any) {
   
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [location, setLocation] = useState(''); // Nueva Mejora: Ubicación
+  const [location, setLocation] = useState('');
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const [professionista, setProfessionista] = useState(false);
@@ -49,6 +45,7 @@ export default function Register({ onRegisterSuccess, onNavigate }: any) {
   const [specialty, setSpecialty] = useState('');
   const [yearsExp, setYearsExp] = useState('1-3');
   const [bio, setBio] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const toggleCategory = (cat: string) => {
     setSelectedCategories(prev => 
@@ -62,6 +59,7 @@ export default function Register({ onRegisterSuccess, onNavigate }: any) {
       return;
     }
 
+    setIsLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
@@ -69,7 +67,7 @@ export default function Register({ onRegisterSuccess, onNavigate }: any) {
       await setDoc(doc(db, "usuarios", uid), {
         firstName,
         lastName,
-        name: `${firstName} ${lastName}`, // Mantenemos el nombre completo para el perfil
+        name: `${firstName} ${lastName}`,
         email,
         phone,
         location,
@@ -83,9 +81,15 @@ export default function Register({ onRegisterSuccess, onNavigate }: any) {
       });
 
       alert("¡Cuenta creada correctamente!");
-      onRegisterSuccess ? onRegisterSuccess() : router.replace('/login');
+      if (onRegisterSuccess) {
+        onRegisterSuccess();
+      } else {
+        router.replace('/login');
+      }
     } catch (error: any) {
       alert("Error: " + error.message);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -94,89 +98,154 @@ export default function Register({ onRegisterSuccess, onNavigate }: any) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           
-          <Text style={styles.title}>Registro</Text>
+          <Text variant="headlineLarge" style={styles.title}>
+            Registro
+          </Text>
 
           <View style={styles.card}>
-            {/* Nombres y Apellidos en la misma fila */}
+            {/* Nombres y Apellidos */}
             <View style={styles.row}>
               <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.label}>Nombre(s)</Text>
-                <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} placeholder="Ej. Juan" />
+                <TextInput 
+                  label="Nombre(s)"
+                  value={firstName} 
+                  onChangeText={setFirstName} 
+                  placeholder="Ej. Juan"
+                  mode="outlined"
+                  style={styles.input}
+                />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Apellidos</Text>
-                <TextInput style={styles.input} value={lastName} onChangeText={setLastName} placeholder="Ej. Pérez" />
+                <TextInput 
+                  label="Apellidos"
+                  value={lastName} 
+                  onChangeText={setLastName} 
+                  placeholder="Ej. Pérez"
+                  mode="outlined"
+                  style={styles.input}
+                />
               </View>
             </View>
 
-            <Text style={styles.label}>Correo electrónico</Text>
-            <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+            <TextInput 
+              label="Correo electrónico"
+              value={email} 
+              onChangeText={setEmail} 
+              keyboardType="email-address" 
+              autoCapitalize="none"
+              mode="outlined"
+              style={styles.input}
+            />
 
             <View style={styles.row}>
               <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.label}>Teléfono</Text>
-                <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" maxLength={10} />
+                <TextInput 
+                  label="Teléfono"
+                  value={phone} 
+                  onChangeText={setPhone} 
+                  keyboardType="phone-pad" 
+                  maxLength={10}
+                  mode="outlined"
+                  style={styles.input}
+                />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>Ciudad / Zona</Text>
-                <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder="Ej. CDMX" />
+                <TextInput 
+                  label="Ciudad / Zona"
+                  value={location} 
+                  onChangeText={setLocation} 
+                  placeholder="Ej. CDMX"
+                  mode="outlined"
+                  style={styles.input}
+                />
               </View>
             </View>
 
-            <Text style={styles.label}>Contraseña</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={[styles.input, { borderWidth: 0, flex: 1 }]}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-              />
-              <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
-                <Text style={styles.eyeText}>{showPassword ? "Ocultar" : "Mostrar"}</Text>
-              </Pressable>
-            </View>
-
-            {/* Indicador de fortaleza (Mejora visual) */}
-            {password.length > 0 && (
-              <View style={[styles.strengthBar, { width: password.length > 8 ? '100%' : '40%', backgroundColor: password.length > 8 ? '#10b981' : '#ef4444' }]} />
-            )}
+            <TextInput
+              label="Contraseña"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              right={
+                <TextInput.Icon 
+                  icon={showPassword ? "eye-off" : "eye"} 
+                  onPress={() => setShowPassword(!showPassword)}
+                />
+              }
+              mode="outlined"
+              style={styles.input}
+            />
 
             <View style={styles.switchRow}>
-              <Text style={styles.label}>¿Quieres ofrecer tus servicios?</Text>
-              <Switch value={professionista} onValueChange={setProfessionista} trackColor={{ true: '#0b5fff' }} />
+              <Text variant="bodyMedium" style={{ fontWeight: '600' }}>
+                ¿Quieres ofrecer tus servicios?
+              </Text>
+              <Switch value={professionista} onValueChange={setProfessionista} />
             </View>
 
             {professionista && (
               <View style={styles.professionBlock}>
-                <Text style={styles.sectionTitle}>Perfil del Profesional</Text>
+                <Text variant="titleMedium" style={{ fontWeight: '800', marginTop: 10 }}>
+                  Perfil del Profesional
+                </Text>
                 
-                <Text style={styles.label}>¿Qué oficios realizas?</Text>
+                <Text variant="bodyMedium" style={{ fontWeight: '600', marginTop: 15 }}>
+                  ¿Qué oficios realizas?
+                </Text>
                 <View style={styles.tagContainer}>
                   {CATEGORIES.map((cat) => (
-                    <Pressable key={cat} onPress={() => toggleCategory(cat)} style={[styles.tag, selectedCategories.includes(cat) && styles.tagSelected]}>
-                      <Text style={[styles.tagText, selectedCategories.includes(cat) && styles.tagTextSelected]}>{cat}</Text>
-                    </Pressable>
+                    <Chip
+                      key={cat}
+                      selected={selectedCategories.includes(cat)}
+                      onPress={() => toggleCategory(cat)}
+                      mode={selectedCategories.includes(cat) ? 'flat' : 'outlined'}
+                      style={{ marginRight: 6, marginBottom: 6 }}
+                    >
+                      {cat}
+                    </Chip>
                   ))}
                 </View>
 
-                <Text style={styles.label}>Especialidad detallada</Text>
-                <TextInput style={styles.input} placeholder="Ej. Plomería industrial y gas" value={specialty} onChangeText={setSpecialty} />
+                <TextInput 
+                  label="Especialidad detallada"
+                  placeholder="Ej. Plomería industrial y gas" 
+                  value={specialty} 
+                  onChangeText={setSpecialty}
+                  mode="outlined"
+                  style={styles.input}
+                />
 
-                <Text style={styles.label}>Experiencia</Text>
+                <Text variant="bodyMedium" style={{ fontWeight: '600', marginTop: 15 }}>
+                  Experiencia
+                </Text>
                 <View style={styles.pickerContainer}>
                   <Picker selectedValue={yearsExp} onValueChange={setYearsExp} style={styles.picker}>
                     {EXP_OPTIONS.map(opt => <Picker.Item key={opt.value} label={opt.label} value={opt.value} />)}
                   </Picker>
                 </View>
 
-                <Text style={styles.label}>Descripción breve (Bio)</Text>
-                <TextInput style={[styles.input, styles.textArea]} value={bio} onChangeText={setBio} multiline placeholder="Cuéntales por qué deberían contratarte..." />
+                <TextInput 
+                  label="Descripción breve (Bio)"
+                  value={bio} 
+                  onChangeText={setBio} 
+                  multiline 
+                  numberOfLines={4}
+                  placeholder="Cuéntales por qué deberían contratarte..." 
+                  mode="outlined"
+                  style={[styles.input, styles.textArea]}
+                />
               </View>
             )}
 
-            <Pressable style={styles.primaryBtn} onPress={handleRegister}>
-              <Text style={styles.primaryBtnText}>Registrarme ahora</Text>
-            </Pressable>
+            <Button 
+              mode="contained" 
+              onPress={handleRegister}
+              loading={isLoading}
+              disabled={isLoading}
+              style={styles.primaryBtn}
+            >
+              Registrarme ahora
+            </Button>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -188,25 +257,15 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f6f8fb' },
   container: { flex: 1 },
   scroll: { padding: 20, paddingBottom: 60 },
-  title: { fontSize: 32, fontWeight: '900', color: '#0b5fff', marginBottom: 20, textAlign: 'center' },
+  title: { fontWeight: '900', color: '#0b5fff', marginBottom: 20, textAlign: 'center' },
   card: { backgroundColor: '#fff', borderRadius: 20, padding: 20, elevation: 6, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 15 },
-  row: { flexDirection: 'row', justifyContent: 'space-between' },
-  label: { color: '#4b5563', marginBottom: 5, marginTop: 15, fontWeight: '600', fontSize: 13 },
-  input: { height: 48, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, paddingHorizontal: 15, backgroundColor: '#f9fafb' },
-  passwordContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, backgroundColor: '#f9fafb' },
-  eyeBtn: { paddingRight: 15 },
-  eyeText: { color: '#0b5fff', fontWeight: 'bold', fontSize: 12 },
-  strengthBar: { height: 4, marginTop: 6, borderRadius: 2 },
-  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: '#1f2937', marginTop: 10 },
-  tagContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  tag: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 15, borderWidth: 1, borderColor: '#0b5fff' },
-  tagSelected: { backgroundColor: '#0b5fff' },
-  tagText: { color: '#0b5fff', fontSize: 12, fontWeight: '600' },
-  tagTextSelected: { color: '#fff' },
-  pickerContainer: { height: 48, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, justifyContent: 'center', backgroundColor: '#f9fafb' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  input: { marginBottom: 12 },
+  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  professionBlock: { marginTop: 20 },
+  tagContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 8, marginBottom: 12 },
+  pickerContainer: { height: 48, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, justifyContent: 'center', backgroundColor: '#f9fafb', marginBottom: 12 },
   picker: { width: '100%' },
-  textArea: { height: 80, textAlignVertical: 'top', paddingTop: 10 },
-  primaryBtn: { height: 55, backgroundColor: '#0b5fff', borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginTop: 30 },
-  primaryBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  textArea: { height: 100 },
+  primaryBtn: { marginTop: 30, paddingVertical: 6 },
 });

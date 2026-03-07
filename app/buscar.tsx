@@ -3,18 +3,17 @@ import { useRouter } from 'expo-router';
 import { collection, query as firestoreQuery, getDocs, where } from "firebase/firestore";
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    View,
 } from 'react-native';
+import { Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { db } from "../firebaseConfig";
 import { AuthContext } from './auth-context';
@@ -140,14 +139,13 @@ export default function Buscar() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
         
         <View style={styles.header}>
-          <Text style={styles.title}>Contratar profesionales</Text>
+          <Text variant="headlineMedium" style={styles.title}>Contratar profesionales</Text>
           <TextInput
             placeholder="Buscar por nombre, oficio o especialidad..."
-            placeholderTextColor="#999"
             style={styles.search}
             value={searchInput}
             onChangeText={setSearchInput}
-            returnKeyType="search"
+            mode="outlined"
           />
         </View>
 
@@ -226,19 +224,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f8fafc' },
   container: { flex: 1 },
   header: { padding: 16 },
-  title: { fontSize: 24, fontWeight: '800', marginBottom: 14, color: '#0f172a' },
+  title: { marginBottom: 14, color: '#0f172a', fontWeight: '800' },
   search: { 
-    backgroundColor: '#fff', 
-    borderRadius: 12, 
-    height: 52, 
-    paddingHorizontal: 16, 
-    borderWidth: 1, 
-    borderColor: '#e2e8f0', 
-    fontSize: 15,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10
+    marginBottom: 12,
   },
   list: { flex: 1 },
   emptyList: { flexGrow: 1, justifyContent: 'center', alignItems: 'center' },

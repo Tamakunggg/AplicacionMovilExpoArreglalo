@@ -2,16 +2,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    View
 } from 'react-native';
+import { IconButton, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from './auth-context';
 
@@ -134,7 +134,7 @@ export default function Favoritos() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.container}>
-        <Text style={styles.title}>Mis Favoritos</Text>
+        <Text variant="headlineMedium" style={styles.title}>Mis Favoritos</Text>
 
         {loading ? (
           <ActivityIndicator size="large" color="#0b5fff" style={{ marginTop: 20 }} />
@@ -150,8 +150,8 @@ export default function Favoritos() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <MaterialCommunityIcons name="heart-outline" size={80} color="#cbd5e1" />
-                <Text style={styles.empty}>Tu lista está vacía</Text>
-                <Text style={styles.subEmpty}>Guarda a los profesionales que más te gusten para tenerlos a mano.</Text>
+                <Text variant="titleMedium" style={styles.empty}>Tu lista está vacía</Text>
+                <Text variant="bodyMedium" style={styles.subEmpty}>Guarda a los profesionales que más te gusten para tenerlos a mano.</Text>
               </View>
             }
             renderItem={({ item }) => (
@@ -194,16 +194,15 @@ export default function Favoritos() {
                   </View>
                 </View>
 
-                {/* Botón de eliminar con icono para que sea más limpio */}
-                <Pressable 
-                  style={styles.removeIconBtn} 
+                {/* Botón de eliminar con Paper IconButton */}
+                <IconButton
+                  icon="heart-remove"
+                  iconColor="#ef4444"
+                  size={24}
                   onPress={(e) => {
-                    e.stopPropagation();
                     removeFavorite(item.id);
                   }}
-                >
-                  <MaterialCommunityIcons name="heart-remove" size={24} color="#ef4444" />
-                </Pressable>
+                />
               </Pressable>
             )}
           />
@@ -258,13 +257,4 @@ const styles = StyleSheet.create({
   
   locationRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center' },
   metaText: { color: '#64748b', fontSize: 12, fontWeight: '500' },
-  
-  removeIconBtn: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    padding: 8,
-    backgroundColor: '#fff5f5',
-    borderRadius: 12,
-  }
 });
