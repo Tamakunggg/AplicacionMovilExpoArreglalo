@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "233581906098",
+    "project_id": "arreglaloexpo",
+    "storage_bucket": "arreglaloexpo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:233581906098:android:7c449c994cd6af3d1361ab",
+        "android_client_info": {
+          "package_name": "com.uasarre.Arreglalo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjt86Z1yRz0ETZh8mqvfkf1v-qdYHC6fo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
