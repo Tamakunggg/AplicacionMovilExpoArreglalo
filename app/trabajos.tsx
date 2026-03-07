@@ -1,6 +1,7 @@
 import React, { useContext, useState } from 'react';
+import { Alert, FlatList, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { Button, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet, FlatList, Pressable, ScrollView, Modal, TextInput, Alert } from 'react-native';
 import { AuthContext } from './auth-context';
 
 type Job = {
@@ -122,9 +123,13 @@ export default function Trabajos() {
               <Text style={styles.jobMeta}>{item.description}</Text>
               <Text style={styles.jobMeta}>Presupuesto: ${item.budget}</Text>
               <Text style={styles.jobMeta}>Profesional: {item.professional.name}</Text>
-              <Pressable style={styles.primaryBtn} onPress={() => openContractView(item)}>
-                <Text style={styles.primaryText}>Ver contrato</Text>
-              </Pressable>
+              <Button 
+                mode="contained" 
+                onPress={() => openContractView(item)}
+                style={{ marginTop: 12 }}
+              >
+                Ver contrato
+              </Button>
             </View>
           )} />
         )}
@@ -139,9 +144,13 @@ export default function Trabajos() {
               <Text style={styles.jobMeta}>Profesional: {item.professional.name}</Text>
               <Text style={styles.jobMeta}>Firmado por cliente: {item.signedByClient ? 'Sí' : 'No'}</Text>
               <Text style={styles.jobMeta}>Firmado por profesional: {item.signedByProfessional ? 'Sí' : 'No'}</Text>
-              <Pressable style={styles.primaryBtn} onPress={() => openCreateContract(item)}>
-                <Text style={styles.primaryText}>Crear contrato</Text>
-              </Pressable>
+              <Button 
+                mode="contained" 
+                onPress={() => openCreateContract(item)}
+                style={{ marginTop: 12 }}
+              >
+                Crear contrato
+              </Button>
             </View>
           )} />
         )}
@@ -166,14 +175,22 @@ export default function Trabajos() {
               ) : (
                 <Text>No hay contrato asociado a este trabajo.</Text>
               )}
-              <View style={{ flexDirection: 'row', marginTop: 12 }}>
-                <Pressable style={[styles.primaryBtn, { flex: 1, marginRight: 8 }]} onPress={() => setContractModalVisible(false)}>
-                  <Text style={styles.primaryText}>Cerrar</Text>
-                </Pressable>
+              <View style={{ flexDirection: 'row', marginTop: 12, gap: 8 }}>
+                <Button 
+                  mode="contained" 
+                  onPress={() => setContractModalVisible(false)}
+                  style={{ flex: 1 }}
+                >
+                  Cerrar
+                </Button>
                 {selectedJob && !selectedJob.contract && (
-                  <Pressable style={[styles.secondaryBtn, { flex: 1 }]} onPress={() => { setContractModalVisible(false); openCreateContract(selectedJob); }}>
-                    <Text style={styles.secondaryText}>Crear contrato</Text>
-                  </Pressable>
+                  <Button 
+                    mode="outlined" 
+                    onPress={() => { setContractModalVisible(false); openCreateContract(selectedJob); }}
+                    style={{ flex: 1 }}
+                  >
+                    Crear contrato
+                  </Button>
                 )}
               </View>
             </View>
@@ -184,20 +201,70 @@ export default function Trabajos() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
               <Text style={{ fontWeight: '700', marginBottom: 8 }}>Crear contrato</Text>
-              <TextInput placeholder="Dirección" value={form.address} onChangeText={v => setForm(f => ({ ...f, address: v }))} style={styles.input} />
-              <TextInput placeholder="Acuerdo (resumen)" value={form.agreement} onChangeText={v => setForm(f => ({ ...f, agreement: v }))} style={styles.input} />
-              <TextInput placeholder="Descripción completa" value={form.description} onChangeText={v => setForm(f => ({ ...f, description: v }))} style={[styles.input, { height: 80 }]} multiline />
-              <TextInput placeholder="ETA (p.ej. 2 días)" value={form.eta} onChangeText={v => setForm(f => ({ ...f, eta: v }))} style={styles.input} />
-              <TextInput placeholder="Pago total" keyboardType="numeric" value={form.payment} onChangeText={v => setForm(f => ({ ...f, payment: v }))} style={styles.input} />
-              <Text style={{ marginTop: 6, marginBottom: 6, color: '#374151' }}>Ingresa tu firma (oculta) para confirmar. Debe coincidir con la firma registrada en tu perfil.</Text>
-              <TextInput placeholder="Firma" secureTextEntry value={signatureInput} onChangeText={setSignatureInput} style={styles.input} />
-              <View style={{ flexDirection: 'row' }}>
-                <Pressable style={[styles.primaryBtn, { flex: 1, marginRight: 8 }]} onPress={submitCreateContract}>
-                  <Text style={styles.primaryText}>Crear</Text>
-                </Pressable>
-                <Pressable style={[styles.secondaryBtn, { flex: 1 }]} onPress={() => setCreateContractVisible(false)}>
-                  <Text style={styles.secondaryText}>Cancelar</Text>
-                </Pressable>
+              <TextInput 
+                label="Dirección" 
+                value={form.address} 
+                onChangeText={v => setForm(f => ({ ...f, address: v }))} 
+                mode="outlined"
+                style={styles.input}
+              />
+              <TextInput 
+                label="Acuerdo (resumen)" 
+                value={form.agreement} 
+                onChangeText={v => setForm(f => ({ ...f, agreement: v }))}
+                mode="outlined"
+                style={styles.input}
+              />
+              <TextInput 
+                label="Descripción completa" 
+                value={form.description} 
+                onChangeText={v => setForm(f => ({ ...f, description: v }))}
+                multiline
+                numberOfLines={4}
+                mode="outlined"
+                style={[styles.input, { height: 100 }]}
+              />
+              <TextInput 
+                label="ETA (p.ej. 2 días)" 
+                value={form.eta} 
+                onChangeText={v => setForm(f => ({ ...f, eta: v }))}
+                mode="outlined"
+                style={styles.input}
+              />
+              <TextInput 
+                label="Pago total" 
+                keyboardType="numeric" 
+                value={form.payment} 
+                onChangeText={v => setForm(f => ({ ...f, payment: v }))}
+                mode="outlined"
+                style={styles.input}
+              />
+              <Text style={{ marginTop: 6, marginBottom: 6, color: '#374151' }}>
+                Ingresa tu firma (oculta) para confirmar. Debe coincidir con la firma registrada en tu perfil.
+              </Text>
+              <TextInput 
+                label="Firma" 
+                secureTextEntry 
+                value={signatureInput} 
+                onChangeText={setSignatureInput}
+                mode="outlined"
+                style={styles.input}
+              />
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Button 
+                  mode="contained" 
+                  onPress={submitCreateContract}
+                  style={{ flex: 1 }}
+                >
+                  Crear
+                </Button>
+                <Button 
+                  mode="outlined" 
+                  onPress={() => setCreateContractVisible(false)}
+                  style={{ flex: 1 }}
+                >
+                  Cancelar
+                </Button>
               </View>
             </View>
           </View>
@@ -215,13 +282,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#fff', padding: 12, borderRadius: 10, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 },
   jobTitle: { fontWeight: '700' },
   jobMeta: { color: '#374151', marginTop: 6 },
-  primaryBtn: { height: 44, marginTop: 12, backgroundColor: '#0b5fff', borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  primaryText: { color: '#fff', fontWeight: '700' },
-  secondaryBtn: { height: 44, marginTop: 12, backgroundColor: '#fff', borderRadius: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#e6e9ef' },
-  secondaryText: { color: '#374151', fontWeight: '700' },
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' },
   modalCard: { width: '92%', backgroundColor: '#fff', borderRadius: 12, padding: 16 },
-  input: { height: 44, borderWidth: 1, borderColor: '#e6e9ef', borderRadius: 8, paddingHorizontal: 8, marginBottom: 12 },
-  smallToggle: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#e6e9ef' },
-  smallToggleActive: { backgroundColor: '#0b5fff', borderColor: '#0b5fff' },
+  input: { marginBottom: 12 },
 });

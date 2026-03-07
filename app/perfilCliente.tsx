@@ -2,7 +2,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { doc, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import React, { useContext, useMemo } from 'react';
-import { Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, View } from 'react-native';
+import { Button, Text } from 'react-native-paper';
 import { db, storage } from '../firebaseConfig';
 import { styles } from '../styles'; // Asegúrate que la ruta sea correcta según tu carpeta
 import { AuthContext } from './auth-context';
@@ -114,9 +115,13 @@ export default function PerfilCliente({ displayed, isViewingOther }: PerfilClien
 
         {!isViewingOther && (
           <View style={{ marginTop: 20 }}>
-            <Pressable style={styles.logoutBtn} onPress={logout}>
-              <Text style={styles.logoutText}>Cerrar sesión</Text>
-            </Pressable>
+            <Button 
+              mode="contained" 
+              onPress={logout}
+              buttonColor="#ef4444"
+            >
+              Cerrar sesión
+            </Button>
           </View>
         )}
       </View>

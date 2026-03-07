@@ -1,15 +1,12 @@
 import { sendPasswordResetEmail } from 'firebase/auth';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    View,
 } from 'react-native';
+import { Button, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth } from '../firebaseConfig';
 
@@ -70,8 +67,12 @@ export default function ForgotPassword({ onNavigate }: Props) {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.container}>
           <View style={styles.brand}>
-            <Text style={styles.brandTitle}>Arreglalo</Text>
-            <Text style={styles.brandSubtitle}>Expertos al servicio</Text>
+            <Text variant="headlineLarge" style={{ fontWeight: '700', color: '#0b5fff' }}>
+              Arreglalo
+            </Text>
+            <Text variant="bodyMedium" style={{ marginTop: 4, color: '#6b7280' }}>
+              Expertos al servicio
+            </Text>
           </View>
 
           <View style={styles.card}>
@@ -79,29 +80,35 @@ export default function ForgotPassword({ onNavigate }: Props) {
               <Text style={styles.successIconText}>✓</Text>
             </View>
 
-            <Text style={styles.successTitle}>¡Correo enviado!</Text>
+            <Text variant="titleLarge" style={styles.successTitle}>
+              ¡Correo enviado!
+            </Text>
 
-            <Text style={styles.successMessage}>
+            <Text variant="bodyMedium" style={styles.successMessage}>
               Hemos enviado un enlace de recuperación a{'\n'}
               <Text style={styles.successEmail}>{email}</Text>
               {'\n\n'}
               Revisa tu correo (incluyendo la carpeta de spam) y sigue los pasos para crear una nueva contraseña.
             </Text>
 
-            <Pressable
-              style={styles.primaryButton}
-              onPress={() => handleNavigate('/login')}>
-              <Text style={styles.primaryButtonText}>Volver al inicio de sesión</Text>
-            </Pressable>
+            <Button 
+              mode="contained"
+              onPress={() => handleNavigate('/login')}
+              style={styles.button}
+            >
+              Volver al inicio de sesión
+            </Button>
 
-            <Pressable
-              style={styles.secondaryButton}
+            <Button 
+              mode="outlined"
               onPress={() => {
                 setSuccess(false);
                 setEmail('');
-              }}>
-              <Text style={styles.secondaryButtonText}>Intentar con otro correo</Text>
-            </Pressable>
+              }}
+              style={styles.button}
+            >
+              Intentar con otro correo
+            </Button>
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -114,49 +121,60 @@ export default function ForgotPassword({ onNavigate }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}>
         <View style={styles.brand}>
-          <Text style={styles.brandTitle}>Arreglalo</Text>
-          <Text style={styles.brandSubtitle}>Expertos al servicio</Text>
+          <Text variant="headlineLarge" style={{ fontWeight: '700', color: '#0b5fff' }}>
+            Arreglalo
+          </Text>
+          <Text variant="bodyMedium" style={{ marginTop: 4, color: '#6b7280' }}>
+            Expertos al servicio
+          </Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.heading}>Recuperar contraseña</Text>
+          <Text variant="titleLarge" style={{ marginBottom: 12, fontWeight: '600' }}>
+            Recuperar contraseña
+          </Text>
 
-          <Text style={styles.description}>
+          <Text variant="bodyMedium" style={styles.description}>
             Ingresa el correo asociado a tu cuenta y te enviaremos un enlace para crear una nueva contraseña.
           </Text>
 
           <TextInput
-            placeholder="Correo electrónico"
-            placeholderTextColor="#999"
+            label="Correo electrónico"
             value={email}
             onChangeText={(text) => {
               setEmail(text);
               setError('');
             }}
-            style={styles.input}
             autoCapitalize="none"
             keyboardType="email-address"
             editable={!loading}
+            mode="outlined"
+            style={styles.input}
           />
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Pressable
-            style={[styles.primaryButton, loading && styles.buttonDisabled]}
+          <Button 
+            mode="contained"
             onPress={handleSendReset}
-            disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Enviar enlace de recuperación</Text>
-            )}
-          </Pressable>
+            loading={loading}
+            disabled={loading}
+            style={styles.button}
+          >
+            Enviar enlace de recuperación
+          </Button>
 
           <View style={styles.row}>
-            <Text style={styles.small}>¿Recuerdas tu contraseña?</Text>
-            <Pressable onPress={() => handleNavigate('/login')}>
-              <Text style={styles.link}> Inicia sesión</Text>
-            </Pressable>
+            <Text variant="bodySmall" style={{ color: '#6b7280' }}>
+              ¿Recuerdas tu contraseña?
+            </Text>
+            <Button 
+              mode="text" 
+              onPress={() => handleNavigate('/login')}
+              compact
+            >
+              Inicia sesión
+            </Button>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -171,10 +189,6 @@ const styles = StyleSheet.create({
 
   brand: { alignItems: 'center', marginBottom: 20 },
 
-  brandTitle: { fontSize: 28, fontWeight: '700', color: '#0b5fff' },
-
-  brandSubtitle: { color: '#6b7280', marginTop: 4 },
-
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -185,23 +199,14 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
 
-  heading: { fontSize: 20, fontWeight: '600', marginBottom: 12 },
-
   description: {
-    fontSize: 14,
-    color: '#6b7280',
     marginBottom: 16,
     lineHeight: 20,
+    color: '#6b7280',
   },
 
   input: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#e6e9ef',
-    borderRadius: 8,
-    paddingHorizontal: 12,
     marginBottom: 12,
-    color: '#111827',
   },
 
   error: {
@@ -211,35 +216,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  primaryButton: {
-    height: 48,
-    backgroundColor: '#0b5fff',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
+  button: {
+    marginVertical: 6,
   },
 
-  primaryButtonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
-
-  secondaryButton: {
-    height: 48,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-
-  secondaryButtonText: { color: '#0b5fff', fontWeight: '600', fontSize: 16 },
-
-  buttonDisabled: { opacity: 0.7 },
-
-  row: { flexDirection: 'row', justifyContent: 'center', marginTop: 14 },
-
-  small: { color: '#6b7280' },
-
-  link: { color: '#0b5fff', fontWeight: '600' },
+  row: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 14 },
 
   successIcon: {
     width: 70,
