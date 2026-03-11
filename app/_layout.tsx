@@ -2,14 +2,24 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as NavigationBar from 'expo-navigation-bar';
 import { Slot, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Animated, AppState, Platform, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  AppState,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useColorScheme,
+} from 'react-native';
 import { PaperProvider } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppDrawer from '../components/AppDrawer';
 import { darkTheme, lightTheme } from '../constants/paperTheme';
-import { db } from "../firebaseConfig";
+import { db } from '../firebaseConfig';
 import { AuthContext, User } from './auth-context';
 import ForgotPassword from './forgot-password';
 import Login from './login';
@@ -19,21 +29,24 @@ export default function RootLayout() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? darkTheme : lightTheme;
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authView, setAuthView] = useState<'login' | 'register' | 'forgot-password'>('login');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [viewUser, setViewUserState] = useState<User | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<'buscar' | 'favoritos' | 'perfil' | 'trabajos'>(
+    'buscar'
+  );
 
   const handleNavigate = (route: string) => {
     if (route === '/register') return setAuthView('register');
     if (route === '/login') return setAuthView('login');
     if (route === '/forgot-password') return setAuthView('forgot-password');
-    router.push(route);
+    router.push(route as any);
   };
 
-  // FUNCIÓN MEJORADA: Ahora busca el documento en Firestore antes de entrar
   const handleLogin = async (userAuth?: User) => {
     if (!userAuth || !userAuth.id) {
       setCurrentUser(null);
@@ -42,18 +55,19 @@ export default function RootLayout() {
     }
 
     setIsLoadingProfile(true);
+
     try {
-      // 1. Referencia al documento del usuario
-      const userDocRef = doc(db, "usuarios", userAuth.id);
+      const userDocRef = doc(db, 'usuarios', userAuth.id);
       const userDocSnap = await getDoc(userDocRef);
 
       if (userDocSnap.exists()) {
         const dbData = userDocSnap.data();
-        
-        // 2. Construimos el usuario "full" con los datos de la base de datos
+
         const fullUserData: User = {
-          ...userAuth, // Mantiene ID y Email del login
-          name: dbData.name || (dbData.firstName ? `${dbData.firstName} ${dbData.lastName}` : userAuth.name),
+          ...userAuth,
+          name:
+            dbData.name ||
+            (dbData.firstName ? `${dbData.firstName} ${dbData.lastName || ''}`.trim() : userAuth.name),
           firstName: dbData.firstName,
           lastName: dbData.lastName,
           type: dbData.type,
@@ -64,17 +78,20 @@ export default function RootLayout() {
           avatar: dbData.avatar,
           location: dbData.location,
           categories: dbData.categories || [],
-          phone: dbData.phone
+          phone: dbData.phone,
+          email: dbData.email || userAuth.email,
+          digitalSignature: dbData.digitalSignature,
+          notificaciones: dbData.notificaciones,
         };
 
         setCurrentUser(fullUserData);
       } else {
-        // Si no hay doc en Firestore, usamos los datos básicos
         setCurrentUser(userAuth);
       }
+
       setIsLoggedIn(true);
     } catch (error) {
-      console.error("Error al cargar perfil tras login:", error);
+      console.error('Error al cargar perfil tras login:', error);
       setCurrentUser(userAuth);
       setIsLoggedIn(true);
     } finally {
@@ -82,26 +99,26 @@ export default function RootLayout() {
     }
   };
 
-  const [activeTab, setActiveTab] = useState<'buscar' | 'favoritos' | 'perfil' | 'trabajos'>('buscar');
-
   useEffect(() => {
     let mounted = true;
+
     const applyNav = async () => {
       if (!mounted) return;
+
       try {
-        if (Platform.OS === 'android' && NavigationBar && NavigationBar.setVisibilityAsync) {
+        if (Platform.OS === 'android' && NavigationBar?.setVisibilityAsync) {
           await NavigationBar.setVisibilityAsync('hidden');
         }
       } catch (e) {
-        // ignore
+        console.log('No se pudo ocultar navigation bar:', e);
       }
     };
 
     applyNav();
 
-    const sub = AppState.addEventListener ? AppState.addEventListener('change', (state) => {
+    const sub = AppState.addEventListener?.('change', (state) => {
       if (state === 'active') applyNav();
-    }) : undefined;
+    });
 
     return () => {
       mounted = false;
@@ -114,9 +131,28 @@ export default function RootLayout() {
       router.replace('/buscar');
       setActiveTab('buscar');
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, router]);
 
-  // Pantalla de Auth (Login/Registro)
+  const goToRoute = (route: '/buscar' | '/trabajos' | '/favoritos' | '/perfil') => {
+    if (route === '/perfil') {
+      setViewUserState(null);
+      setActiveTab('perfil');
+      router.push('/perfil');
+      return;
+    }
+
+    if (route === '/buscar') setActiveTab('buscar');
+    if (route === '/trabajos') setActiveTab('trabajos');
+    if (route === '/favoritos') setActiveTab('favoritos');
+
+    router.push(route);
+  };
+
+  const closeDrawerAndNavigate = (route: string) => {
+    setDrawerVisible(false);
+    router.push(route as any);
+  };
+
   if (!isLoggedIn) {
     return (
       <PaperProvider theme={theme}>
@@ -128,7 +164,10 @@ export default function RootLayout() {
             ) : authView === 'login' ? (
               <Login onLogin={(u) => handleLogin(u)} onNavigate={handleNavigate} />
             ) : authView === 'register' ? (
-              <Register onRegisterSuccess={() => setAuthView('login')} onNavigate={handleNavigate} />
+              <Register
+                onRegisterSuccess={() => setAuthView('login')}
+                onNavigate={handleNavigate}
+              />
             ) : (
               <ForgotPassword onNavigate={handleNavigate} />
             )}
@@ -138,23 +177,28 @@ export default function RootLayout() {
     );
   }
 
-  // Pantalla Principal (App)
   return (
     <PaperProvider theme={theme}>
-      <AuthContext.Provider 
-        value={{ 
-          logout: () => { setIsLoggedIn(false); setCurrentUser(null); }, 
-          user: currentUser, 
-          setUser: setCurrentUser, 
-          viewUser, 
-          setViewUser: (u?: User | null) => { setViewUserState(u ?? null); } 
+      <AuthContext.Provider
+        value={{
+          logout: () => {
+            setIsLoggedIn(false);
+            setCurrentUser(null);
+            setViewUserState(null);
+            setDrawerVisible(false);
+          },
+          user: currentUser,
+          setUser: setCurrentUser,
+          viewUser,
+          setViewUser: (u?: User | null) => {
+            setViewUserState(u ?? null);
+          },
         }}
       >
         <View style={styles.container}>
           <StatusBar style="light" backgroundColor="#0b5fff" />
-          
-          {/* Header con Hamburguesa y Logo */}
-          <SafeAreaView edges={["top"]} style={styles.headerSafe}>
+
+          <SafeAreaView edges={['top']} style={styles.headerSafe}>
             <View style={styles.header}>
               <Pressable
                 onPress={() => setDrawerVisible(true)}
@@ -163,39 +207,48 @@ export default function RootLayout() {
                   pressed && styles.hamburgerBtnPressed,
                 ]}
               >
-                <MaterialCommunityIcons 
-                  name="menu" 
-                  size={24} 
-                  color="#0b5fff"
-                />
+                <MaterialCommunityIcons name="menu" size={24} color="#0b5fff" />
               </Pressable>
-              
+
               <View style={styles.logoContainer}>
                 <Text style={styles.logoText}>Arréglalo</Text>
               </View>
-              
+
               <View style={styles.headerSpace} />
             </View>
           </SafeAreaView>
 
-          {/* Content */}
           <View style={styles.content}>
             <Slot />
           </View>
-          
-          {/* Bottom Navigation */}
-          <SafeAreaView edges={["bottom"]} style={styles.navSafeArea} pointerEvents="box-none">
+
+          <SafeAreaView edges={['bottom']} style={styles.navSafeArea} pointerEvents="box-none">
             <View style={styles.navWrapper} pointerEvents="box-none">
               <View style={styles.nav}>
-                <NavButton label="Contratar" route="/buscar" active={activeTab === 'buscar'} onPress={() => { router.push('/buscar'); setActiveTab('buscar'); }} />
-                <NavButton label="Trabajos" route="/trabajos" active={activeTab === 'trabajos'} onPress={() => { router.push('/trabajos'); setActiveTab('trabajos'); }} />
-                <NavButton label="Favoritos" route="/favoritos" active={activeTab === 'favoritos'} onPress={() => { router.push('/favoritos'); setActiveTab('favoritos'); }} />
-                <NavButton label="Perfil" route="/perfil" active={activeTab === 'perfil'} onPress={() => { setViewUserState(null); router.push('/perfil'); setActiveTab('perfil'); }} />
+                <NavButton
+                  label="Contratar"
+                  active={activeTab === 'buscar'}
+                  onPress={() => goToRoute('/buscar')}
+                />
+                <NavButton
+                  label="Trabajos"
+                  active={activeTab === 'trabajos'}
+                  onPress={() => goToRoute('/trabajos')}
+                />
+                <NavButton
+                  label="Favoritos"
+                  active={activeTab === 'favoritos'}
+                  onPress={() => goToRoute('/favoritos')}
+                />
+                <NavButton
+                  label="Perfil"
+                  active={activeTab === 'perfil'}
+                  onPress={() => goToRoute('/perfil')}
+                />
               </View>
             </View>
           </SafeAreaView>
 
-          {/* App Drawer */}
           <AppDrawer
             visible={drawerVisible}
             onClose={() => setDrawerVisible(false)}
@@ -210,7 +263,9 @@ export default function RootLayout() {
                 label: 'Mi Perfil',
                 icon: 'account-circle-outline',
                 onPress: () => {
+                  setDrawerVisible(false);
                   setViewUserState(null);
+                  setActiveTab('perfil');
                   router.push('/perfil');
                 },
               },
@@ -219,8 +274,7 @@ export default function RootLayout() {
                 label: 'Configuración',
                 icon: 'cog-outline',
                 onPress: () => {
-                  // Será implementado después
-                  console.log('Abrir Ajustes');
+                  closeDrawerAndNavigate('/configuracion');
                 },
               },
               {
@@ -228,8 +282,7 @@ export default function RootLayout() {
                 label: 'Ayuda y Soporte',
                 icon: 'help-circle-outline',
                 onPress: () => {
-                  // Será implementado después
-                  console.log('Abrir Ayuda');
+                  closeDrawerAndNavigate('/ayuda');
                 },
               },
               {
@@ -237,8 +290,7 @@ export default function RootLayout() {
                 label: 'Acerca de',
                 icon: 'information-outline',
                 onPress: () => {
-                  // Será implementado después
-                  console.log('Abrir Acerca de');
+                  closeDrawerAndNavigate('/acerca');
                 },
               },
             ]}
@@ -249,8 +301,10 @@ export default function RootLayout() {
                 icon: 'logout',
                 danger: true,
                 onPress: () => {
+                  setDrawerVisible(false);
                   setIsLoggedIn(false);
                   setCurrentUser(null);
+                  setViewUserState(null);
                 },
               },
             ]}
@@ -261,19 +315,39 @@ export default function RootLayout() {
   );
 }
 
-function NavButton({ label, onPress, active }: { label: string; onPress: () => void; active?: boolean; route?: string }) {
+function NavButton({
+  label,
+  onPress,
+  active,
+}: {
+  label: string;
+  onPress: () => void;
+  active?: boolean;
+}) {
   const scale = React.useRef(new Animated.Value(1)).current;
 
   const onPressIn = () => {
-    Animated.spring(scale, { toValue: 0.96, useNativeDriver: true }).start();
+    Animated.spring(scale, {
+      toValue: 0.96,
+      useNativeDriver: true,
+    }).start();
   };
+
   const onPressOut = () => {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
   };
 
   return (
     <Animated.View style={[styles.navButton, { transform: [{ scale }] }]}>
-      <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} style={styles.pressableArea}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={styles.pressableArea}
+      >
         <Text style={[styles.navText, active ? styles.navTextActive : null]}>{label}</Text>
       </Pressable>
     </Animated.View>
@@ -281,7 +355,10 @@ function NavButton({ label, onPress, active }: { label: string; onPress: () => v
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   headerSafe: {
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -316,7 +393,9 @@ const styles = StyleSheet.create({
   headerSpace: {
     flex: 1,
   },
-  content: { flex: 1 },
+  content: {
+    flex: 1,
+  },
   navSafeArea: {
     backgroundColor: '#fff',
   },
@@ -354,7 +433,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    height: '100%'
+    height: '100%',
   },
-  contentSafe: { flex: 1 },
+  contentSafe: {
+    flex: 1,
+  },
 });
