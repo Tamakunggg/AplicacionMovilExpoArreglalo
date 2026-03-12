@@ -3,7 +3,6 @@ import {
   collection,
   doc,
   onSnapshot,
-  orderBy,
   query,
   where,
 } from 'firebase/firestore';
@@ -27,6 +26,8 @@ type ChatItem = {
   clientName?: string;
   professionalName?: string;
   lastMessage?: string;
+  updatedAt?: any;
+  participants?: string[];
 };
 
 export default function MisChats() {
@@ -43,7 +44,7 @@ export default function MisChats() {
   const [notificationChatId, setNotificationChatId] = useState('');
 
   const previousUnreadRef = useRef<Record<string, number>>({});
-  const timerRef = useRef<any>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!user?.id) {
@@ -52,19 +53,26 @@ export default function MisChats() {
       return;
     }
 
+    setLoading(true);
+
     const q = query(
       collection(db, 'chats'),
-      where('participants', 'array-contains', user.id),
-      orderBy('updatedAt', 'desc')
+      where('participants', 'array-contains', user.id)
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const data = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        })) as ChatItem[];
+        const data = snapshot.docs
+          .map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          }))
+          .sort((a: any, b: any) => {
+            const aTime = a.updatedAt?.seconds || 0;
+            const bTime = b.updatedAt?.seconds || 0;
+            return bTime - aTime;
+          }) as ChatItem[];
 
         setChats(data);
         setLoading(false);
@@ -75,7 +83,7 @@ export default function MisChats() {
       }
     );
 
-    return unsubscribe;
+    return () => unsubscribe();
   }, [user?.id]);
 
   useEffect(() => {
@@ -84,39 +92,45 @@ export default function MisChats() {
     const unsubscribers = chats.map((chat) => {
       const unreadRef = doc(db, 'chats', chat.id, 'meta', 'unreadCounts');
 
-      return onSnapshot(unreadRef, (snapshot) => {
-        const data = snapshot.exists() ? snapshot.data() : {};
-        const count = Number(data?.[user.id] || 0);
+      return onSnapshot(
+        unreadRef,
+        (snapshot) => {
+          const data = snapshot.exists() ? snapshot.data() : {};
+          const count = Number(data?.[user.id] || 0);
 
-        setUnreadMap((prev) => {
-          const updated = {
-            ...prev,
-            [chat.id]: count,
-          };
+          setUnreadMap((prev) => {
+            const updated = {
+              ...prev,
+              [chat.id]: count,
+            };
 
-          const previousCount = previousUnreadRef.current[chat.id] || 0;
+            const previousCount = previousUnreadRef.current[chat.id] || 0;
 
-          if (count > previousCount) {
-            const chatName =
-              user.id === chat.clientId
-                ? chat.professionalName || 'Profesionista'
-                : chat.clientName || 'Cliente';
+            if (count > previousCount) {
+              const chatName =
+                user.id === chat.clientId
+                  ? chat.professionalName || 'Profesionista'
+                  : chat.clientName || 'Cliente';
 
-            setNotificationTitle(`Nuevo mensaje de ${chatName}`);
-            setNotificationMessage(chat.lastMessage?.trim() || 'Tienes un mensaje nuevo');
-            setNotificationChatId(chat.id);
-            setNotificationVisible(true);
+              setNotificationTitle(`Nuevo mensaje de ${chatName}`);
+              setNotificationMessage(chat.lastMessage?.trim() || 'Tienes un mensaje nuevo');
+              setNotificationChatId(chat.id);
+              setNotificationVisible(true);
 
-            if (timerRef.current) clearTimeout(timerRef.current);
-            timerRef.current = setTimeout(() => {
-              setNotificationVisible(false);
-            }, 3500);
-          }
+              if (timerRef.current) clearTimeout(timerRef.current);
+              timerRef.current = setTimeout(() => {
+                setNotificationVisible(false);
+              }, 3500);
+            }
 
-          previousUnreadRef.current[chat.id] = count;
-          return updated;
-        });
-      });
+            previousUnreadRef.current[chat.id] = count;
+            return updated;
+          });
+        },
+        (error) => {
+          console.error(`Error leyendo unreadCounts del chat ${chat.id}:`, error);
+        }
+      );
     });
 
     return () => {
@@ -136,7 +150,10 @@ export default function MisChats() {
   };
 
   const openChat = (chatId: string) => {
-    router.push(`/chat/${chatId}`);
+    router.push({
+      pathname: '/chatDetalle',
+      params: { chatId },
+    });
   };
 
   if (loading) {
@@ -160,7 +177,10 @@ export default function MisChats() {
           onPress={() => {
             setNotificationVisible(false);
             if (notificationChatId) {
-              router.push(`/chat/${notificationChatId}`);
+              router.push({
+                pathname: '/chatDetalle',
+                params: { chatId: notificationChatId },
+              });
             }
           }}
         />
@@ -190,7 +210,9 @@ export default function MisChats() {
 
                   <View style={styles.info}>
                     <View style={styles.topRow}>
-                      <Text style={styles.name}>{getChatName(item)}</Text>
+                      <Text style={styles.name} numberOfLines={1}>
+                        {getChatName(item)}
+                      </Text>
 
                       {unreadCount > 0 && (
                         <View style={styles.badge}>
@@ -208,7 +230,8 @@ export default function MisChats() {
                 </Pressable>
               );
             }}
-            contentContainerStyle={{ paddingBottom: 20 }}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
           />
         )}
       </View>
@@ -237,6 +260,9 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: '#6b7280',
+  },
+  listContent: {
+    paddingBottom: 20,
   },
   card: {
     backgroundColor: '#fff',
@@ -277,6 +303,7 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 4,
     flex: 1,
+    marginRight: 8,
   },
   message: {
     color: '#6b7280',

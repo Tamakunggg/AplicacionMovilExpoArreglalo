@@ -29,13 +29,16 @@ import { getOrCreateChat } from '../services/chat';
 import {
   getProfessionalReviews,
   getProfessionalReviewsSummary,
-} from '../services/reviews';
+} from '../services/reviewsService';
 import { styles } from '../styles';
 import { AuthContext } from './auth-context';
 
 type ReviewItem = {
   id: string;
+  professionalId?: string;
+  clientId?: string;
   clientName?: string;
+  serviceId?: string;
   rating?: number;
   comment?: string;
   createdAt?: any;
@@ -112,7 +115,7 @@ export default function PerfilProfesionista({
     if (summary.total > 0) return summary.average.toFixed(1);
     if (typeof displayed?.rating === 'number') return Number(displayed.rating).toFixed(1);
     return '0.0';
-  }, [summary, displayed?.rating]);
+  }, [summary.total, summary.average, displayed?.rating]);
 
   const totalResenas = useMemo(() => {
     if (summary.total > 0) return summary.total;
@@ -134,13 +137,27 @@ export default function PerfilProfesionista({
       if (!currentUser || !displayed?.id || !isViewingOther) return;
 
       try {
-        const q = query(
+        const qNew = query(
+          collection(db, 'favoritos'),
+          where('userId', '==', currentUser.uid),
+          where('professionalId', '==', displayed.id)
+        );
+
+        const snapshotNew = await getDocs(qNew);
+
+        if (!snapshotNew.empty) {
+          setFavorite(true);
+          return;
+        }
+
+        const qOld = query(
           collection(db, 'favoritos'),
           where('userId', '==', currentUser.uid),
           where('profesionalId', '==', displayed.id)
         );
-        const snapshot = await getDocs(q);
-        setFavorite(!snapshot.empty);
+
+        const snapshotOld = await getDocs(qOld);
+        setFavorite(!snapshotOld.empty);
       } catch (error) {
         console.error('Error checking favorite:', error);
       }
@@ -155,8 +172,10 @@ export default function PerfilProfesionista({
 
       try {
         setLoadingReviews(true);
+
         const data = await getProfessionalReviews(displayed.id);
         const dataSummary = await getProfessionalReviewsSummary(displayed.id);
+
         setReviews(data as ReviewItem[]);
         setSummary(dataSummary);
       } catch (error) {
@@ -171,7 +190,9 @@ export default function PerfilProfesionista({
 
   const formatReviewDate = (createdAt: any) => {
     if (!createdAt?.seconds) return 'Fecha no disponible';
+
     const date = new Date(createdAt.seconds * 1000);
+
     return date.toLocaleDateString('es-MX', {
       year: 'numeric',
       month: 'long',
@@ -199,6 +220,7 @@ export default function PerfilProfesionista({
     if (isViewingOther) return;
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
     if (!permission.granted) {
       Alert.alert('Permiso requerido', 'Necesitamos acceso a tus fotos.');
       return;
@@ -279,16 +301,33 @@ export default function PerfilProfesionista({
     setFavLoading(true);
 
     try {
-      const q = query(
+      const qNew = query(
+        collection(db, 'favoritos'),
+        where('userId', '==', currentUser.uid),
+        where('professionalId', '==', displayed.id)
+      );
+
+      const snapshotNew = await getDocs(qNew);
+
+      if (!snapshotNew.empty) {
+        const deletePromises = snapshotNew.docs.map((d) =>
+          deleteDoc(doc(db, 'favoritos', d.id))
+        );
+        await Promise.all(deletePromises);
+        setFavorite(false);
+        return;
+      }
+
+      const qOld = query(
         collection(db, 'favoritos'),
         where('userId', '==', currentUser.uid),
         where('profesionalId', '==', displayed.id)
       );
 
-      const snapshot = await getDocs(q);
+      const snapshotOld = await getDocs(qOld);
 
-      if (!snapshot.empty) {
-        const deletePromises = snapshot.docs.map((d) =>
+      if (!snapshotOld.empty) {
+        const deletePromises = snapshotOld.docs.map((d) =>
           deleteDoc(doc(db, 'favoritos', d.id))
         );
         await Promise.all(deletePromises);
@@ -296,7 +335,7 @@ export default function PerfilProfesionista({
       } else {
         await addDoc(collection(db, 'favoritos'), {
           userId: currentUser.uid,
-          profesionalId: displayed.id,
+          professionalId: displayed.id,
           createdAt: serverTimestamp(),
         });
         setFavorite(true);
@@ -318,8 +357,8 @@ export default function PerfilProfesionista({
     router.push({
       pathname: '/solicitudServicio',
       params: {
-        profesionalId: displayed.id,
-        profesionalNombre: fullName,
+        professionalId: displayed.id,
+        professionalName: fullName,
       },
     });
   };
@@ -367,27 +406,6 @@ export default function PerfilProfesionista({
     await Linking.openURL(url);
   };
 
-  const irACalificar = () => {
-    if (!displayed?.id) {
-      Alert.alert('Error', 'No se encontró el profesionista.');
-      return;
-    }
-
-    if (!user?.id || !user?.name) {
-      Alert.alert('Atención', 'Debes iniciar sesión para calificar.');
-      return;
-    }
-
-    router.push({
-      pathname: '/calificar',
-      params: {
-        professionalId: displayed.id,
-        clientId: user.id,
-        clientName: user.name,
-      },
-    });
-  };
-
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
@@ -429,6 +447,7 @@ export default function PerfilProfesionista({
               <Text style={styles.avatarLetter}>{fullName.charAt(0).toUpperCase()}</Text>
             </View>
           )}
+
           {!isViewingOther && (
             <View style={styles.editBadge}>
               <Text style={styles.editBadgeText}>Editar</Text>
@@ -441,6 +460,7 @@ export default function PerfilProfesionista({
 
           <View style={styles.badgeRow}>
             <Text style={styles.role}>Profesionista</Text>
+
             {recomendado && (
               <Text
                 style={{
@@ -457,6 +477,7 @@ export default function PerfilProfesionista({
                 Recomendado
               </Text>
             )}
+
             {displayed.location && (
               <Text style={styles.locationBadge}>📍 {displayed.location}</Text>
             )}
@@ -466,6 +487,7 @@ export default function PerfilProfesionista({
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Oficios y Servicios</Text>
+
         <View style={styles.tagRow}>
           {displayed.categories && displayed.categories.length > 0 ? (
             displayed.categories.map((cat, i) => (
@@ -568,6 +590,7 @@ export default function PerfilProfesionista({
                     <Text style={{ fontWeight: '700', color: '#111827' }}>
                       {review.clientName || 'Cliente'}
                     </Text>
+
                     <Text style={{ color: '#6b7280', fontSize: 12 }}>
                       {formatReviewDate(review.createdAt)}
                     </Text>
@@ -632,14 +655,6 @@ export default function PerfilProfesionista({
                 icon="chat-outline"
               >
                 Contactar
-              </Button>
-
-              <Button
-                mode="outlined"
-                onPress={irACalificar}
-                icon="star-outline"
-              >
-                Dejar reseña
               </Button>
             </>
           ) : (

@@ -15,10 +15,11 @@
       "package": "com.uasarre.Arreglalo",
       "googleServicesFile": "./google-services.json",
       "permissions": [
-        "INTERNET",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "CAMERA"
+        "android.permission.INTERNET",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -45,9 +46,11 @@
       ]
     ],
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "d8795b23-f013-4958-bcad-2962f44eafb1"
+        "projectId": "b5bd59bb-a825-467c-8307-c759e44253da"
       }
-    }
+    },
+    "owner": "ba.rivera23"
   }
 }

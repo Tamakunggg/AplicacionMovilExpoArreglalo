@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Button, HelperText, Text, TextInput } from 'react-native-paper';
 import { auth, db } from '../firebaseConfig';
+import { createContract } from '../services/contractsService';
 import { isEmpty } from '../utils/validators';
 import { AuthContext } from './auth-context';
 
@@ -18,8 +19,14 @@ export default function SolicitudServicio() {
   const { user } = useContext(AuthContext);
   const params = useLocalSearchParams();
 
-  const profesionalId = String(params.profesionalId || '');
-  const profesionalNombre = String(params.profesionalNombre || 'Profesionista');
+  const professionalId = String(params.profesionalId || params.professionalId || '');
+  const professionalName = String(
+    params.profesionalNombre || params.professionalName || 'Profesionista'
+  );
+  const professionalPhone = String(
+    params.profesionalTelefono || params.professionalPhone || ''
+  );
+  const professionalCategory = String(params.categoria || params.category || '');
 
   const [servicio, setServicio] = useState('');
   const [descripcion, setDescripcion] = useState('');
@@ -27,6 +34,7 @@ export default function SolicitudServicio() {
   const [fecha, setFecha] = useState('');
   const [hora, setHora] = useState('');
   const [presupuesto, setPresupuesto] = useState('');
+  const [condiciones, setCondiciones] = useState('');
   const [loading, setLoading] = useState(false);
 
   const [errors, setErrors] = useState({
@@ -36,6 +44,7 @@ export default function SolicitudServicio() {
     fecha: '',
     hora: '',
     presupuesto: '',
+    condiciones: '',
   });
 
   const resetForm = () => {
@@ -45,6 +54,7 @@ export default function SolicitudServicio() {
     setFecha('');
     setHora('');
     setPresupuesto('');
+    setCondiciones('');
     setErrors({
       servicio: '',
       descripcion: '',
@@ -52,6 +62,7 @@ export default function SolicitudServicio() {
       fecha: '',
       hora: '',
       presupuesto: '',
+      condiciones: '',
     });
   };
 
@@ -73,6 +84,7 @@ export default function SolicitudServicio() {
       fecha: '',
       hora: '',
       presupuesto: '',
+      condiciones: '',
     };
 
     if (isEmpty(servicio)) {
@@ -99,12 +111,16 @@ export default function SolicitudServicio() {
       nuevosErrores.hora = 'Usa el formato 10:00 AM.';
     }
 
-    if (!isEmpty(presupuesto)) {
-      if (isNaN(Number(presupuesto))) {
-        nuevosErrores.presupuesto = 'El presupuesto debe ser numérico.';
-      } else if (Number(presupuesto) < 0) {
-        nuevosErrores.presupuesto = 'El presupuesto no puede ser negativo.';
-      }
+    if (isEmpty(presupuesto)) {
+      nuevosErrores.presupuesto = 'Ingresa el precio pactado o presupuesto.';
+    } else if (isNaN(Number(presupuesto))) {
+      nuevosErrores.presupuesto = 'El presupuesto debe ser numérico.';
+    } else if (Number(presupuesto) <= 0) {
+      nuevosErrores.presupuesto = 'El presupuesto debe ser mayor a 0.';
+    }
+
+    if (isEmpty(condiciones)) {
+      nuevosErrores.condiciones = 'Ingresa las condiciones del servicio.';
     }
 
     setErrors(nuevosErrores);
@@ -113,8 +129,12 @@ export default function SolicitudServicio() {
       return 'No se encontró el usuario autenticado.';
     }
 
-    if (!profesionalId) {
+    if (!professionalId) {
       return 'No se encontró el profesionista seleccionado.';
+    }
+
+    if (!user?.name) {
+      return 'No se encontró el nombre del cliente.';
     }
 
     const hayErrores = Object.values(nuevosErrores).some((error) => error !== '');
@@ -138,31 +158,64 @@ export default function SolicitudServicio() {
 
       const currentUid = auth?.currentUser?.uid;
 
+      if (!currentUid) {
+        Alert.alert('Error', 'No hay un usuario autenticado.');
+        return;
+      }
+
+      const clientName = user?.name || 'Cliente';
+      const scheduledDate = `${fecha.trim()} ${hora.trim()}`;
+
+      const contractId = await createContract({
+        clientId: currentUid,
+        clientName,
+        professionalId,
+        professionalName,
+        serviceTitle: servicio.trim(),
+        serviceDescription: descripcion.trim(),
+        agreedPrice: Number(presupuesto),
+        conditions: condiciones.trim(),
+        address: direccion.trim(),
+        scheduledDate,
+      });
+
       await addDoc(collection(db, 'solicitudesServicio'), {
-        servicio: servicio.trim(),
-        descripcion: descripcion.trim(),
-        direccion: direccion.trim(),
-        fecha: fecha.trim(),
-        hora: hora.trim(),
-        presupuesto: presupuesto.trim() ? Number(presupuesto) : 0,
-        estado: 'request',
-        clientId: currentUid || '',
-        clientName: user?.name || 'Cliente',
-        professionalId: profesionalId,
-        professionalName: profesionalNombre,
-        professionalDigitalSignature: '',
-        signedByClient: false,
-        signedByProfessional: false,
-        alreadyRated: false,
+        clientId: currentUid,
+        clientName,
+        clientPhone: user?.phone || '',
+        clientEmail: user?.email || auth.currentUser?.email || '',
+        professionalId,
+        professionalName,
+        professionalPhone,
+        title: servicio.trim(),
+        description: descripcion.trim(),
+        category: professionalCategory || servicio.trim(),
+        address: direccion.trim(),
+        budget: Number(presupuesto),
+        conditions: condiciones.trim(),
+        date: fecha.trim(),
+        time: hora.trim(),
+        scheduledDate,
+        status: 'solicitud_enviada',
+        paymentStatus: 'pendiente',
+        contractId,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
       resetForm();
-      Alert.alert('Éxito', 'La solicitud se envió correctamente.');
-      router.replace('/trabajos');
-    } catch (error) {
+
+      Alert.alert('Éxito', 'La solicitud y el contrato se guardaron correctamente.');
+
+      router.replace({
+        pathname: '/contratoDetalle',
+        params: {
+          contractId,
+        },
+      });
+    } catch (error: any) {
       console.error('Error al guardar la solicitud:', error);
-      Alert.alert('Error', 'No se pudo guardar la solicitud.');
+      Alert.alert('Error', error?.message || 'No se pudo guardar la solicitud.');
     } finally {
       setLoading(false);
     }
@@ -177,7 +230,7 @@ export default function SolicitudServicio() {
         <Text style={styles.title}>Solicitud de servicio</Text>
 
         <Text style={styles.subtitle}>
-          Profesionista seleccionado: {profesionalNombre}
+          Profesionista seleccionado: {professionalName}
         </Text>
 
         <TextInput
@@ -258,11 +311,13 @@ export default function SolicitudServicio() {
         </HelperText>
 
         <TextInput
-          label="Presupuesto estimado"
+          label="Precio pactado / presupuesto"
           value={presupuesto}
           onChangeText={(text) => {
             setPresupuesto(text);
-            if (errors.presupuesto) setErrors((prev) => ({ ...prev, presupuesto: '' }));
+            if (errors.presupuesto) {
+              setErrors((prev) => ({ ...prev, presupuesto: '' }));
+            }
           }}
           mode="outlined"
           style={styles.input}
@@ -273,6 +328,25 @@ export default function SolicitudServicio() {
           {errors.presupuesto}
         </HelperText>
 
+        <TextInput
+          label="Condiciones del servicio"
+          value={condiciones}
+          onChangeText={(text) => {
+            setCondiciones(text);
+            if (errors.condiciones) {
+              setErrors((prev) => ({ ...prev, condiciones: '' }));
+            }
+          }}
+          mode="outlined"
+          multiline
+          numberOfLines={4}
+          style={styles.input}
+          placeholder="Ej. Incluye mano de obra, materiales no incluidos, pago contra entrega..."
+        />
+        <HelperText type="error" visible={!!errors.condiciones}>
+          {errors.condiciones}
+        </HelperText>
+
         <View style={styles.buttonsWrap}>
           <Button
             mode="contained"
@@ -281,7 +355,7 @@ export default function SolicitudServicio() {
             disabled={loading}
             style={styles.button}
           >
-            Enviar solicitud
+            Crear contrato
           </Button>
 
           <Button
@@ -319,6 +393,7 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: '#fff',
+    marginBottom: 2,
   },
   buttonsWrap: {
     marginTop: 12,

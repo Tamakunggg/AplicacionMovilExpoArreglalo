@@ -10,24 +10,26 @@ import {
 import { Button, Card, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { addReview } from '../services/reviews';
+import { createReview } from '../services/reviewsService';
 import { isEmpty, isValidRating } from '../utils/validators';
 
 export default function CalificarScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
+  const contractId = String(params.contractId || '');
   const professionalId = String(params.professionalId || '');
   const clientId = String(params.clientId || '');
   const clientName = String(params.clientName || '');
+  const serviceId = String(params.serviceId || params.contractId || '');
 
   const [rating, setRating] = useState<number>(5);
   const [comment, setComment] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
   const submitReview = async () => {
-    if (!professionalId || !clientId || !clientName) {
-      Alert.alert('Error', 'Faltan datos para enviar la calificación.');
+    if (!contractId || !professionalId || !clientId || !clientName || !serviceId) {
+      Alert.alert('Error', 'Faltan datos del contrato para enviar la calificación.');
       return;
     }
 
@@ -44,19 +46,24 @@ export default function CalificarScreen() {
     try {
       setLoading(true);
 
-      await addReview({
+      await createReview({
+        contractId,
         professionalId,
         clientId,
         clientName,
+        serviceId,
         rating,
         comment: comment.trim(),
       });
 
       Alert.alert('Éxito', 'Calificación enviada correctamente.');
       router.back();
-    } catch (error) {
-      console.log(error);
-      Alert.alert('Error', 'No se pudo guardar la calificación.');
+    } catch (error: any) {
+      console.error('Error al guardar la calificación:', error);
+      Alert.alert(
+        'Error',
+        error?.message || 'No se pudo guardar la calificación.'
+      );
     } finally {
       setLoading(false);
     }

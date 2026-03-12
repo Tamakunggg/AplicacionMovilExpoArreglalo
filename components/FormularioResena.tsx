@@ -10,29 +10,29 @@ import { ActivityIndicator, Button, Text, TextInput } from 'react-native-paper';
 import { crearResena } from '../services/resenasService';
 
 type Props = {
-  profesionalId: string;
-  clienteId: string;
-  servicioId: string;
+  professionalId: string;
+  clientId: string;
+  serviceId: string;
   onResenaGuardada?: () => void;
 };
 
 export default function FormularioResena({
-  profesionalId,
-  clienteId,
-  servicioId,
+  professionalId,
+  clientId,
+  serviceId,
   onResenaGuardada,
 }: Props) {
-  const [calificacion, setCalificacion] = useState<number>(0);
-  const [comentario, setComentario] = useState<string>('');
+  const [rating, setRating] = useState<number>(0);
+  const [comment, setComment] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
 
   const guardarResena = async () => {
-    if (calificacion === 0) {
+    if (rating === 0) {
       Alert.alert('Error', 'Debes seleccionar una calificación.');
       return;
     }
 
-    if (!comentario.trim()) {
+    if (!comment.trim()) {
       Alert.alert('Error', 'Debes escribir un comentario.');
       return;
     }
@@ -41,16 +41,16 @@ export default function FormularioResena({
       setLoading(true);
 
       await crearResena({
-        profesionalId,
-        clienteId,
-        servicioId,
-        calificacion,
-        comentario,
+        professionalId,
+        clientId,
+        serviceId,
+        rating,
+        comment,
       });
 
       Alert.alert('Éxito', 'Tu reseña se guardó correctamente.');
-      setCalificacion(0);
-      setComentario('');
+      setRating(0);
+      setComment('');
 
       onResenaGuardada?.();
     } catch (error: any) {
@@ -70,10 +70,11 @@ export default function FormularioResena({
         {[1, 2, 3, 4, 5].map((estrella) => (
           <TouchableOpacity
             key={estrella}
-            onPress={() => setCalificacion(estrella)}
+            onPress={() => setRating(estrella)}
+            activeOpacity={0.8}
           >
             <MaterialIcons
-              name={estrella <= calificacion ? 'star' : 'star-border'}
+              name={estrella <= rating ? 'star' : 'star-border'}
               size={36}
               color="#f5b301"
               style={styles.star}
@@ -86,9 +87,10 @@ export default function FormularioResena({
         label="Comentario"
         mode="outlined"
         multiline
-        value={comentario}
-        onChangeText={setComentario}
+        value={comment}
+        onChangeText={setComment}
         style={styles.input}
+        placeholder="Escribe cómo fue tu experiencia con el servicio"
       />
 
       <Button

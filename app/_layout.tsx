@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as NavigationBar from 'expo-navigation-bar';
-import { Slot, useRouter } from 'expo-router';
+import { Slot, usePathname, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
@@ -27,6 +27,7 @@ import Register from './register';
 
 export default function RootLayout() {
   const router = useRouter();
+  const pathname = usePathname();
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? darkTheme : lightTheme;
 
@@ -67,7 +68,9 @@ export default function RootLayout() {
           ...userAuth,
           name:
             dbData.name ||
-            (dbData.firstName ? `${dbData.firstName} ${dbData.lastName || ''}`.trim() : userAuth.name),
+            (dbData.firstName
+              ? `${dbData.firstName} ${dbData.lastName || ''}`.trim()
+              : userAuth.name),
           firstName: dbData.firstName,
           lastName: dbData.lastName,
           type: dbData.type,
@@ -132,6 +135,21 @@ export default function RootLayout() {
       setActiveTab('buscar');
     }
   }, [isLoggedIn, router]);
+
+  useEffect(() => {
+    if (pathname?.startsWith('/buscar')) setActiveTab('buscar');
+    else if (
+      pathname?.startsWith('/trabajos') ||
+      pathname?.startsWith('/trabajosCliente') ||
+      pathname?.startsWith('/trabajosProfesional')
+    ) {
+      setActiveTab('trabajos');
+    } else if (pathname?.startsWith('/favoritos')) {
+      setActiveTab('favoritos');
+    } else if (pathname?.startsWith('/perfil')) {
+      setActiveTab('perfil');
+    }
+  }, [pathname]);
 
   const goToRoute = (route: '/buscar' | '/trabajos' | '/favoritos' | '/perfil') => {
     if (route === '/perfil') {
@@ -267,6 +285,26 @@ export default function RootLayout() {
                   setViewUserState(null);
                   setActiveTab('perfil');
                   router.push('/perfil');
+                },
+              },
+              {
+                id: 'jobs',
+                label: 'Mis Trabajos',
+                icon: 'briefcase-outline',
+                onPress: () => {
+                  setDrawerVisible(false);
+                  setActiveTab('trabajos');
+                  router.push('/trabajos');
+                },
+              },
+              {
+                id: 'favorites',
+                label: 'Favoritos',
+                icon: 'heart-outline',
+                onPress: () => {
+                  setDrawerVisible(false);
+                  setActiveTab('favoritos');
+                  router.push('/favoritos');
                 },
               },
               {

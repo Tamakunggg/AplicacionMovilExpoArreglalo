@@ -1,9 +1,10 @@
 import ProfessionChips from '@/components/profession-chips';
 import { useRouter } from 'expo-router';
-import { collection, query as firestoreQuery, getDocs, where } from "firebase/firestore";
+import { collection, query as firestoreQuery, getDocs, where } from 'firebase/firestore';
 import React, { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -15,7 +16,7 @@ import {
 } from 'react-native';
 import { Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { db } from "../firebaseConfig";
+import { db } from '../firebaseConfig';
 import { AuthContext } from './auth-context';
 
 type Item = {
@@ -24,7 +25,7 @@ type Item = {
   profession: string;
   rating: number;
   location?: string;
-  avatar?: any;
+  avatar?: string | null;
   distance?: number;
   bio?: string;
   categories?: string[];
@@ -32,6 +33,8 @@ type Item = {
   email?: string;
   firstName?: string;
   lastName?: string;
+  specialty?: string;
+  reviewsCount?: number;
 };
 
 const PROFESSIONS = [
@@ -85,12 +88,14 @@ export default function Buscar() {
   const router = useRouter();
 
   const cargarProfesionales = useCallback(async (isRefreshing = false) => {
-    if (!isRefreshing && !searchCache) setLoading(true);
+    if (!isRefreshing && !searchCache) {
+      setLoading(true);
+    }
 
     try {
       const q = firestoreQuery(
-        collection(db, "usuarios"),
-        where("type", "==", "profesionista")
+        collection(db, 'usuarios'),
+        where('type', '==', 'profesionista')
       );
 
       const querySnapshot = await getDocs(q);
@@ -108,8 +113,9 @@ export default function Buscar() {
           firstName: data.firstName || '',
           lastName: data.lastName || '',
           profession: data.specialty || 'General',
+          specialty: data.specialty || 'General',
           rating: Number(data.rating || 0),
-          location: data.location || "Culiacán",
+          location: data.location || 'Culiacán',
           avatar: data.avatar || null,
           distance: Math.floor(Math.random() * 25) + 1,
           bio: data.bio || '',
@@ -120,13 +126,15 @@ export default function Buscar() {
               : [],
           yearsExp: data.yearsExp || 'N/A',
           email: data.email || '',
+          reviewsCount: Number(data.reviewsCount || 0),
         };
       });
 
       setProfesionistas(lista);
       searchCache = lista;
     } catch (error) {
-      console.log("Error cargando profesionistas:", error);
+      console.error('Error cargando profesionistas:', error);
+      Alert.alert('Error', 'No se pudieron cargar los profesionistas.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -134,7 +142,9 @@ export default function Buscar() {
   }, []);
 
   useEffect(() => {
-    if (!searchCache) cargarProfesionales();
+    if (!searchCache) {
+      cargarProfesionales();
+    }
   }, [cargarProfesionales]);
 
   const onRefresh = () => {
@@ -185,17 +195,17 @@ export default function Buscar() {
   }, [profesionistas, selected, searchInput, maxDistance, sortBy]);
 
   const ICONS: Record<string, string> = {
-    'Electricista': 'flash-outline',
-    'Plomero': 'pipe-wrench',
-    'Carpintero': 'hammer',
-    'Jardinero': 'leaf',
-    'Pintor': 'brush',
-    'Cerrajero': 'key-variant',
-    'Soldador': 'fire',
-    'Yesero': 'tools',
-    'Albañil': 'domain',
+    Electricista: 'flash-outline',
+    Plomero: 'pipe-wrench',
+    Carpintero: 'hammer',
+    Jardinero: 'leaf',
+    Pintor: 'brush',
+    Cerrajero: 'key-variant',
+    Soldador: 'fire',
+    Yesero: 'tools',
+    Albañil: 'domain',
     'Técnico en audio': 'music',
-    'Fontanero': 'pipe',
+    Fontanero: 'pipe',
   };
 
   const activeFilterText = selected
@@ -203,7 +213,7 @@ export default function Buscar() {
     : 'Mostrando todas las especialidades';
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
@@ -225,9 +235,7 @@ export default function Buscar() {
             {results.length} resultado{results.length === 1 ? '' : 's'}
           </Text>
 
-          <Text style={styles.filterInfo}>
-            {activeFilterText}
-          </Text>
+          <Text style={styles.filterInfo}>{activeFilterText}</Text>
         </View>
 
         <ProfessionChips

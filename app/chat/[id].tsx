@@ -38,43 +38,69 @@ type ChatInfo = {
 
 export default function ChatScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams();
   const { user } = useContext(AuthContext);
+
+  const chatId = useMemo(() => {
+    const rawId = params.id;
+    if (Array.isArray(rawId)) return String(rawId[0] || '');
+    return String(rawId || '');
+  }, [params.id]);
 
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
-  const typingTimeout = useRef<any>(null);
+  const [loadingChat, setLoadingChat] = useState(true);
+
+  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!id) return;
+    if (!chatId) {
+      setLoadingChat(false);
+      return;
+    }
 
-    const unsubscribeMessages = subscribeMessages(String(id), setMessages);
-    const unsubscribeChatInfo = subscribeChatInfo(String(id), setChatInfo);
+    setLoadingChat(true);
+
+    const unsubscribeMessages = subscribeMessages(chatId, (data: MessageItem[]) => {
+      setMessages(data);
+      setLoadingChat(false);
+    });
+
+    const unsubscribeChatInfo = subscribeChatInfo(chatId, (data: ChatInfo | null) => {
+      setChatInfo(data);
+    });
 
     return () => {
       unsubscribeMessages();
       unsubscribeChatInfo();
     };
-  }, [id]);
+  }, [chatId]);
 
   useEffect(() => {
-    if (!id || !user?.id) return;
-    markMessagesAsRead(String(id), user.id);
-  }, [id, user?.id, messages.length]);
+    if (!chatId || !user?.id) return;
+
+    markMessagesAsRead(chatId, user.id).catch((error) => {
+      console.error('Error marcando mensajes como leídos:', error);
+    });
+  }, [chatId, user?.id, messages.length]);
 
   useEffect(() => {
     return () => {
-      if (typingTimeout.current) clearTimeout(typingTimeout.current);
-      if (id && user?.id) {
-        setTypingStatus(String(id), user.id, false).catch(() => {});
+      if (typingTimeout.current) {
+        clearTimeout(typingTimeout.current);
+      }
+
+      if (chatId && user?.id) {
+        setTypingStatus(chatId, user.id, false).catch(() => {});
       }
     };
-  }, [id, user?.id]);
+  }, [chatId, user?.id]);
 
   const otherName = useMemo(() => {
     if (!chatInfo || !user?.id) return 'Chat';
+
     return user.id === chatInfo.clientId
       ? chatInfo.professionalName || 'Profesionista'
       : chatInfo.clientName || 'Cliente';
@@ -85,9 +111,19 @@ export default function ChatScreen() {
     return chatInfo.typingBy !== '' && chatInfo.typingBy !== user.id;
   }, [chatInfo?.typingBy, user?.id]);
 
+  const sortedMessages = useMemo(() => {
+    return [...messages].sort((a, b) => {
+      const aTime = a.createdAt?.seconds || 0;
+      const bTime = b.createdAt?.seconds || 0;
+      return bTime - aTime;
+    });
+  }, [messages]);
+
   const formatTime = (timestamp: any) => {
     if (!timestamp?.seconds) return '';
+
     const date = new Date(timestamp.seconds * 1000);
+
     return date.toLocaleTimeString([], {
       hour: 'numeric',
       minute: '2-digit',
@@ -97,15 +133,17 @@ export default function ChatScreen() {
   const handleTyping = async (value: string) => {
     setText(value);
 
-    if (!id || !user?.id) return;
+    if (!chatId || !user?.id) return;
 
     try {
-      await setTypingStatus(String(id), user.id, value.trim().length > 0);
+      await setTypingStatus(chatId, user.id, value.trim().length > 0);
 
-      if (typingTimeout.current) clearTimeout(typingTimeout.current);
+      if (typingTimeout.current) {
+        clearTimeout(typingTimeout.current);
+      }
 
       typingTimeout.current = setTimeout(() => {
-        setTypingStatus(String(id), user.id, false).catch(() => {});
+        setTypingStatus(chatId, user.id, false).catch(() => {});
       }, 1200);
     } catch (error) {
       console.error('Error actualizando typing:', error);
@@ -113,20 +151,41 @@ export default function ChatScreen() {
   };
 
   const handleSend = async () => {
-    if (!id || !user?.id) return;
+    if (!chatId || !user?.id) return;
     if (isEmpty(text)) return;
 
     try {
       setSending(true);
-      await sendMessage(String(id), user.id, text.trim());
+
+      const cleanText = text.trim();
+
+      await sendMessage(chatId, user.id, cleanText);
       setText('');
-      await setTypingStatus(String(id), user.id, false);
+
+      await setTypingStatus(chatId, user.id, false);
+
+      if (typingTimeout.current) {
+        clearTimeout(typingTimeout.current);
+      }
     } catch (error) {
       console.error('Error enviando mensaje:', error);
     } finally {
       setSending(false);
     }
   };
+
+  if (!chatId) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <View style={styles.centered}>
+          <Text>No se encontró el chat.</Text>
+          <Button mode="contained" onPress={() => router.back()} style={styles.backErrorButton}>
+            Volver
+          </Button>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -143,6 +202,7 @@ export default function ChatScreen() {
             <Text variant="titleMedium" style={styles.headerTitle}>
               {otherName}
             </Text>
+
             {isOtherTyping && (
               <Text style={styles.typingText}>Escribiendo...</Text>
             )}
@@ -151,44 +211,52 @@ export default function ChatScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <FlatList
-          data={messages}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          renderItem={({ item }) => {
-            const isMine = item.senderId === user?.id;
+        {loadingChat ? (
+          <View style={styles.centered}>
+            <Text>Cargando mensajes...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={sortedMessages}
+            keyExtractor={(item) => item.id}
+            inverted
+            contentContainerStyle={styles.list}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => {
+              const isMine = item.senderId === user?.id;
 
-            return (
-              <View
-                style={[
-                  styles.messageBubble,
-                  isMine ? styles.myMessage : styles.theirMessage,
-                ]}
-              >
-                <Text style={isMine ? styles.myMessageText : styles.theirMessageText}>
-                  {item.text || ''}
-                </Text>
-
-                <View style={styles.messageFooter}>
-                  <Text style={isMine ? styles.myTimeText : styles.theirTimeText}>
-                    {formatTime(item.createdAt)}
+              return (
+                <View
+                  style={[
+                    styles.messageBubble,
+                    isMine ? styles.myMessage : styles.theirMessage,
+                  ]}
+                >
+                  <Text style={isMine ? styles.myMessageText : styles.theirMessageText}>
+                    {item.text || ''}
                   </Text>
 
-                  {isMine && (
-                    <Text style={styles.readMark}>
-                      {(item.readBy || []).length > 1 ? '✓✓' : '✓'}
+                  <View style={styles.messageFooter}>
+                    <Text style={isMine ? styles.myTimeText : styles.theirTimeText}>
+                      {formatTime(item.createdAt)}
                     </Text>
-                  )}
+
+                    {isMine && (
+                      <Text style={styles.readMark}>
+                        {(item.readBy || []).length > 1 ? '✓✓' : '✓'}
+                      </Text>
+                    )}
+                  </View>
                 </View>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>Aún no hay mensajes.</Text>
               </View>
-            );
-          }}
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>Aún no hay mensajes.</Text>
-            </View>
-          }
-        />
+            }
+          />
+        )}
 
         <View style={styles.inputWrap}>
           <TextInput
@@ -206,7 +274,7 @@ export default function ChatScreen() {
             mode="contained"
             onPress={handleSend}
             loading={sending}
-            disabled={sending}
+            disabled={sending || isEmpty(text)}
             style={styles.sendButton}
             contentStyle={styles.sendButtonContent}
             labelStyle={styles.sendButtonLabel}
@@ -227,6 +295,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  backErrorButton: {
+    marginTop: 14,
+  },
   header: {
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -234,10 +311,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
   },
   headerCenter: {
     alignItems: 'center',
     justifyContent: 'center',
+    flex: 1,
   },
   headerTitle: {
     fontWeight: '700',
