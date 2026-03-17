@@ -1,155 +1,157 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import React, { useContext, useState } from 'react';
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { router, useLocalSearchParams } from "expo-router";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import React, { useContext, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   View,
-} from 'react-native';
-import { Button, HelperText, Text, TextInput } from 'react-native-paper';
-import { auth, db } from '../firebaseConfig';
-import { createContract } from '../services/contractsService';
-import { isEmpty } from '../utils/validators';
-import { AuthContext } from './auth-context';
+} from "react-native";
+import { Button, HelperText, Text, TextInput } from "react-native-paper";
+import { auth, db } from "../firebaseConfig";
+import { createContract } from "../services/contractsService";
+import { isEmpty } from "../utils/validators";
+import { AuthContext } from "./auth-context";
+
 
 export default function SolicitudServicio() {
   const { user } = useContext(AuthContext);
   const params = useLocalSearchParams();
 
-  const professionalId = String(params.profesionalId || params.professionalId || '');
+  const professionalId = String(
+    params.profesionalId || params.professionalId || "",
+  );
   const professionalName = String(
-    params.profesionalNombre || params.professionalName || 'Profesionista'
+    params.profesionalNombre || params.professionalName || "Profesionista",
   );
   const professionalPhone = String(
-    params.profesionalTelefono || params.professionalPhone || ''
+    params.profesionalTelefono || params.professionalPhone || "",
   );
-  const professionalCategory = String(params.categoria || params.category || '');
+  const professionalCategory = String(
+    params.categoria || params.category || "",
+  );
 
-  const [servicio, setServicio] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [direccion, setDireccion] = useState('');
-  const [fecha, setFecha] = useState('');
-  const [hora, setHora] = useState('');
-  const [presupuesto, setPresupuesto] = useState('');
-  const [condiciones, setCondiciones] = useState('');
+  const [servicio, setServicio] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [presupuesto, setPresupuesto] = useState("");
+  const [condiciones, setCondiciones] = useState("");
+
+  // Estados para fecha y hora con Date objects
+  const [fecha, setFecha] = useState(new Date());
+  const [hora, setHora] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
   const [loading, setLoading] = useState(false);
 
   const [errors, setErrors] = useState({
-    servicio: '',
-    descripcion: '',
-    direccion: '',
-    fecha: '',
-    hora: '',
-    presupuesto: '',
-    condiciones: '',
+    servicio: "",
+    descripcion: "",
+    direccion: "",
+    fecha: "",
+    hora: "",
+    presupuesto: "",
+    condiciones: "",
   });
 
   const resetForm = () => {
-    setServicio('');
-    setDescripcion('');
-    setDireccion('');
-    setFecha('');
-    setHora('');
-    setPresupuesto('');
-    setCondiciones('');
+    setServicio("");
+    setDescripcion("");
+    setDireccion("");
+    setPresupuesto("");
+    setCondiciones("");
+    setFecha(new Date());
+    setHora(new Date());
     setErrors({
-      servicio: '',
-      descripcion: '',
-      direccion: '',
-      fecha: '',
-      hora: '',
-      presupuesto: '',
-      condiciones: '',
+      servicio: "",
+      descripcion: "",
+      direccion: "",
+      fecha: "",
+      hora: "",
+      presupuesto: "",
+      condiciones: "",
     });
-  };
-
-  const validarFecha = (value: string) => {
-    return /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/.test(value.trim());
-  };
-
-  const validarHora = (value: string) => {
-    return /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM|am|pm)$/.test(value.trim());
   };
 
   const validarFormulario = () => {
     const currentUid = auth?.currentUser?.uid;
 
     const nuevosErrores = {
-      servicio: '',
-      descripcion: '',
-      direccion: '',
-      fecha: '',
-      hora: '',
-      presupuesto: '',
-      condiciones: '',
+      servicio: "",
+      descripcion: "",
+      direccion: "",
+      fecha: "",
+      hora: "",
+      presupuesto: "",
+      condiciones: "",
     };
 
     if (isEmpty(servicio)) {
-      nuevosErrores.servicio = 'Ingresa el tipo de servicio.';
+      nuevosErrores.servicio = "Ingresa el tipo de servicio.";
     }
 
     if (isEmpty(descripcion)) {
-      nuevosErrores.descripcion = 'Describe el problema o servicio solicitado.';
+      nuevosErrores.descripcion = "Describe el problema o servicio solicitado.";
     }
 
     if (isEmpty(direccion)) {
-      nuevosErrores.direccion = 'Ingresa la dirección.';
+      nuevosErrores.direccion = "Ingresa la dirección.";
     }
 
-    if (isEmpty(fecha)) {
-      nuevosErrores.fecha = 'Ingresa la fecha.';
-    } else if (!validarFecha(fecha)) {
-      nuevosErrores.fecha = 'Usa el formato DD/MM/AAAA.';
+    if (!fecha) {
+      nuevosErrores.fecha = "Selecciona una fecha.";
     }
 
-    if (isEmpty(hora)) {
-      nuevosErrores.hora = 'Ingresa la hora.';
-    } else if (!validarHora(hora)) {
-      nuevosErrores.hora = 'Usa el formato 10:00 AM.';
+    if (!hora) {
+      nuevosErrores.hora = "Selecciona una hora.";
     }
 
     if (isEmpty(presupuesto)) {
-      nuevosErrores.presupuesto = 'Ingresa el precio pactado o presupuesto.';
+      nuevosErrores.presupuesto = "Ingresa el precio pactado o presupuesto.";
     } else if (isNaN(Number(presupuesto))) {
-      nuevosErrores.presupuesto = 'El presupuesto debe ser numérico.';
+      nuevosErrores.presupuesto = "El presupuesto debe ser numérico.";
     } else if (Number(presupuesto) <= 0) {
-      nuevosErrores.presupuesto = 'El presupuesto debe ser mayor a 0.';
+      nuevosErrores.presupuesto = "El presupuesto debe ser mayor a 0.";
     }
 
     if (isEmpty(condiciones)) {
-      nuevosErrores.condiciones = 'Ingresa las condiciones del servicio.';
+      nuevosErrores.condiciones = "Ingresa las condiciones del servicio.";
     }
 
     setErrors(nuevosErrores);
 
     if (!currentUid) {
-      return 'No se encontró el usuario autenticado.';
+      return "No se encontró el usuario autenticado.";
     }
 
     if (!professionalId) {
-      return 'No se encontró el profesionista seleccionado.';
+      return "No se encontró el profesionista seleccionado.";
     }
 
     if (!user?.name) {
-      return 'No se encontró el nombre del cliente.';
+      return "No se encontró el nombre del cliente.";
     }
 
-    const hayErrores = Object.values(nuevosErrores).some((error) => error !== '');
+    const hayErrores = Object.values(nuevosErrores).some(
+      (error) => error !== "",
+    );
     if (hayErrores) {
-      return 'Corrige los campos marcados.';
+      return "Corrige los campos marcados.";
     }
 
-    return '';
+    return "";
   };
 
   const guardarSolicitud = async () => {
     const error = validarFormulario();
 
     if (error) {
-      Alert.alert('Formulario inválido', error);
+      Alert.alert("Formulario inválido", error);
       return;
     }
 
@@ -159,12 +161,25 @@ export default function SolicitudServicio() {
       const currentUid = auth?.currentUser?.uid;
 
       if (!currentUid) {
-        Alert.alert('Error', 'No hay un usuario autenticado.');
+        Alert.alert("Error", "No hay un usuario autenticado.");
         return;
       }
 
-      const clientName = user?.name || 'Cliente';
-      const scheduledDate = `${fecha.trim()} ${hora.trim()}`;
+      const clientName = user?.name || "Cliente";
+
+      // Combinar fecha y hora en un string legible
+      const fechaObj = new Date(fecha);
+      const horaObj = new Date(hora);
+
+      const dia = fechaObj.getDate().toString().padStart(2, "0");
+      const mes = (fechaObj.getMonth() + 1).toString().padStart(2, "0");
+      const anio = fechaObj.getFullYear();
+      const horas = horaObj.getHours().toString().padStart(2, "0");
+      const minutos = horaObj.getMinutes().toString().padStart(2, "0");
+
+      const fechaFormateada = `${dia}/${mes}/${anio}`;
+      const horaFormateada = `${horas}:${minutos}`;
+      const scheduledDate = `${fechaFormateada} ${horaFormateada}`;
 
       const contractId = await createContract({
         clientId: currentUid,
@@ -179,11 +194,11 @@ export default function SolicitudServicio() {
         scheduledDate,
       });
 
-      await addDoc(collection(db, 'solicitudesServicio'), {
+      await addDoc(collection(db, "solicitudesServicio"), {
         clientId: currentUid,
         clientName,
-        clientPhone: user?.phone || '',
-        clientEmail: user?.email || auth.currentUser?.email || '',
+        clientPhone: user?.phone || "",
+        clientEmail: user?.email || auth.currentUser?.email || "",
         professionalId,
         professionalName,
         professionalPhone,
@@ -193,11 +208,11 @@ export default function SolicitudServicio() {
         address: direccion.trim(),
         budget: Number(presupuesto),
         conditions: condiciones.trim(),
-        date: fecha.trim(),
-        time: hora.trim(),
+        date: fechaFormateada,
+        time: horaFormateada,
         scheduledDate,
-        status: 'solicitud_enviada',
-        paymentStatus: 'pendiente',
+        status: "solicitud_enviada",
+        paymentStatus: "pendiente",
         contractId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -205,17 +220,23 @@ export default function SolicitudServicio() {
 
       resetForm();
 
-      Alert.alert('Éxito', 'La solicitud y el contrato se guardaron correctamente.');
+      Alert.alert(
+        "Éxito",
+        "La solicitud y el contrato se guardaron correctamente.",
+      );
 
       router.replace({
-        pathname: '/contratoDetalle',
+        pathname: "/contratoDetalle",
         params: {
           contractId,
         },
       });
     } catch (error: any) {
-      console.error('Error al guardar la solicitud:', error);
-      Alert.alert('Error', error?.message || 'No se pudo guardar la solicitud.');
+      console.error("Error al guardar la solicitud:", error);
+      Alert.alert(
+        "Error",
+        error?.message || "No se pudo guardar la solicitud.",
+      );
     } finally {
       setLoading(false);
     }
@@ -224,7 +245,7 @@ export default function SolicitudServicio() {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Solicitud de servicio</Text>
@@ -238,7 +259,8 @@ export default function SolicitudServicio() {
           value={servicio}
           onChangeText={(text) => {
             setServicio(text);
-            if (errors.servicio) setErrors((prev) => ({ ...prev, servicio: '' }));
+            if (errors.servicio)
+              setErrors((prev) => ({ ...prev, servicio: "" }));
           }}
           mode="outlined"
           style={styles.input}
@@ -253,7 +275,8 @@ export default function SolicitudServicio() {
           value={descripcion}
           onChangeText={(text) => {
             setDescripcion(text);
-            if (errors.descripcion) setErrors((prev) => ({ ...prev, descripcion: '' }));
+            if (errors.descripcion)
+              setErrors((prev) => ({ ...prev, descripcion: "" }));
           }}
           mode="outlined"
           multiline
@@ -270,7 +293,8 @@ export default function SolicitudServicio() {
           value={direccion}
           onChangeText={(text) => {
             setDireccion(text);
-            if (errors.direccion) setErrors((prev) => ({ ...prev, direccion: '' }));
+            if (errors.direccion)
+              setErrors((prev) => ({ ...prev, direccion: "" }));
           }}
           mode="outlined"
           style={styles.input}
@@ -280,32 +304,113 @@ export default function SolicitudServicio() {
           {errors.direccion}
         </HelperText>
 
-        <TextInput
-          label="Fecha"
-          value={fecha}
-          onChangeText={(text) => {
-            setFecha(text);
-            if (errors.fecha) setErrors((prev) => ({ ...prev, fecha: '' }));
-          }}
-          mode="outlined"
-          style={styles.input}
-          placeholder="DD/MM/AAAA"
-        />
+        {/* Selector de Fecha */}
+        <Text style={styles.label}>Fecha del servicio</Text>
+        {Platform.OS === "web" ? (
+          <input
+            type="date"
+            value={fecha.toISOString().split("T")[0]}
+            onChange={(e) => {
+              const newDate = new Date(e.target.value);
+              if (!isNaN(newDate.getTime())) {
+                setFecha(newDate);
+                if (errors.fecha) setErrors((prev) => ({ ...prev, fecha: "" }));
+              }
+            }}
+            style={{
+              width: "100%",
+              padding: 14,
+              fontSize: 16,
+              borderWidth: 1,
+              borderColor: "#e5e7eb",
+              borderRadius: 12,
+              backgroundColor: "#f9fafb",
+              marginBottom: 2,
+            }}
+          />
+        ) : (
+          <>
+            <Pressable
+              onPress={() => setShowDatePicker(true)}
+              style={styles.pickerButton}
+            >
+              <Text>{fecha.toLocaleDateString()}</Text>
+            </Pressable>
+            {showDatePicker && (
+              <DateTimePicker
+                value={fecha}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) {
+                    setFecha(selectedDate);
+                    if (errors.fecha)
+                      setErrors((prev) => ({ ...prev, fecha: "" }));
+                  }
+                }}
+              />
+            )}
+          </>
+        )}
         <HelperText type="error" visible={!!errors.fecha}>
           {errors.fecha}
         </HelperText>
 
-        <TextInput
-          label="Hora"
-          value={hora}
-          onChangeText={(text) => {
-            setHora(text);
-            if (errors.hora) setErrors((prev) => ({ ...prev, hora: '' }));
-          }}
-          mode="outlined"
-          style={styles.input}
-          placeholder="Ej. 10:00 AM"
-        />
+        {/* Selector de Hora */}
+        <Text style={styles.label}>Hora del servicio</Text>
+        {Platform.OS === "web" ? (
+          <input
+            type="time"
+            value={`${hora.getHours().toString().padStart(2, "0")}:${hora.getMinutes().toString().padStart(2, "0")}`}
+            onChange={(e) => {
+              const [hours, minutes] = e.target.value.split(":").map(Number);
+              const newTime = new Date(hora);
+              newTime.setHours(hours, minutes);
+              setHora(newTime);
+              if (errors.hora) setErrors((prev) => ({ ...prev, hora: "" }));
+            }}
+            style={{
+              width: "100%",
+              padding: 14,
+              fontSize: 16,
+              borderWidth: 1,
+              borderColor: "#e5e7eb",
+              borderRadius: 12,
+              backgroundColor: "#f9fafb",
+              marginBottom: 2,
+            }}
+          />
+        ) : (
+          <>
+            <Pressable
+              onPress={() => setShowTimePicker(true)}
+              style={styles.pickerButton}
+            >
+              <Text>
+                {hora.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </Text>
+            </Pressable>
+            {showTimePicker && (
+              <DateTimePicker
+                value={hora}
+                mode="time"
+                display="default"
+                onChange={(event, selectedTime) => {
+                  setShowTimePicker(false);
+                  if (selectedTime) {
+                    setHora(selectedTime);
+                    if (errors.hora)
+                      setErrors((prev) => ({ ...prev, hora: "" }));
+                  }
+                }}
+              />
+            )}
+          </>
+        )}
         <HelperText type="error" visible={!!errors.hora}>
           {errors.hora}
         </HelperText>
@@ -316,7 +421,7 @@ export default function SolicitudServicio() {
           onChangeText={(text) => {
             setPresupuesto(text);
             if (errors.presupuesto) {
-              setErrors((prev) => ({ ...prev, presupuesto: '' }));
+              setErrors((prev) => ({ ...prev, presupuesto: "" }));
             }
           }}
           mode="outlined"
@@ -334,7 +439,7 @@ export default function SolicitudServicio() {
           onChangeText={(text) => {
             setCondiciones(text);
             if (errors.condiciones) {
-              setErrors((prev) => ({ ...prev, condiciones: '' }));
+              setErrors((prev) => ({ ...prev, condiciones: "" }));
             }
           }}
           mode="outlined"
@@ -374,7 +479,7 @@ export default function SolicitudServicio() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#f6f8fb',
+    backgroundColor: "#f6f8fb",
   },
   container: {
     padding: 20,
@@ -382,17 +487,32 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 26,
-    fontWeight: '700',
+    fontWeight: "700",
     marginBottom: 8,
-    color: '#111827',
+    color: "#111827",
   },
   subtitle: {
     fontSize: 15,
-    color: '#6b7280',
+    color: "#6b7280",
     marginBottom: 20,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
+    marginBottom: 2,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  pickerButton: {
+    backgroundColor: "#f9fafb",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 2,
   },
   buttonsWrap: {
@@ -401,7 +521,7 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#f97316',
+    backgroundColor: "#f97316",
   },
   secondaryButton: {
     marginTop: 10,
