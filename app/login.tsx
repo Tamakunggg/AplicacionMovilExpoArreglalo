@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  View,
 } from 'react-native';
 import { Button, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,97 +12,119 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { User } from './auth-context';
 
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from '../firebaseConfig';
-
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebaseConfig";
+import { auth, db } from '../firebaseConfig';
+
+import { isEmpty, isValidEmail } from '../utils/validators';
 
 type Props = {
   onLogin?: (user?: User) => void;
   onNavigate?: (route: string) => void;
 };
 
+type FirestoreUserData = {
+  name?: string;
+  phone?: string;
+  type?: string;
+  avatar?: string;
+  specialty?: string;
+  credential?: string;
+  yearsExp?: string;
+  rating?: number;
+};
+
 export default function Login({ onLogin, onNavigate }: Props) {
   const router = useRouter();
   const [user, setUser] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleNavigate = (route: string) => {
     if (onNavigate) return onNavigate(route);
-    router.push(route);
+    router.push(route as any);
   };
 
-const handleLogin = async () => {
-  setIsLoading(true);
-  try {
-
-    const userCredential = await signInWithEmailAndPassword(
-      auth,
-      user,
-      password
-    );
-
-    const firebaseUser = userCredential.user;
-
-    console.log("Usuario logueado:", firebaseUser.email);
-
-    // 🔹 Buscar datos en Firestore
-    const userRef = doc(db, "usuarios", firebaseUser.uid);
-    const userSnap = await getDoc(userRef);
-
-    let userData = {};
-
-    if (userSnap.exists()) {
-      userData = userSnap.data();
-      console.log("Datos Firestore:", userData);
+  const handleLogin = async () => {
+    if (isEmpty(user) || isEmpty(password)) {
+      alert('Correo y contraseña son obligatorios.');
+      return;
     }
 
-    if (onLogin) {
-      onLogin({
-        id: firebaseUser.uid,
-        name: userData.name || "",
-        email: firebaseUser.email ?? "",
-        phone: userData.phone || "",
-        type: userData.type || "cliente",
-        avatar: userData.avatar || undefined,
-        specialty: userData.specialty || undefined,
-        credential: userData.credential || undefined,
-        yearsExp: userData.yearsExp || undefined,
-        rating: userData.rating || 0
-      });
-    } else {
-      router.replace("/home");
+    if (!isValidEmail(user.trim())) {
+      alert('Ingresa un correo electrónico válido.');
+      return;
     }
 
-  } catch (error: any) {
-    alert("Error al iniciar sesión: " + error.message);
-  } finally {
-    setIsLoading(false);
-  }
-};
+    setIsLoading(true);
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        user.trim(),
+        password
+      );
+
+      const firebaseUser = userCredential.user;
+
+      console.log("Usuario logueado:", firebaseUser.email);
+
+      const userRef = doc(db, "usuarios", firebaseUser.uid);
+      const userSnap = await getDoc(userRef);
+
+      let userData: FirestoreUserData = {};
+
+      if (userSnap.exists()) {
+        userData = userSnap.data() as FirestoreUserData;
+        console.log("Datos Firestore:", userData);
+      }
+
+      if (onLogin) {
+        onLogin({
+          id: firebaseUser.uid,
+          name: userData.name || "",
+          email: firebaseUser.email ?? "",
+          phone: userData.phone || "",
+          type: (userData.type as "cliente" | "profesionista") || "cliente",
+          avatar: userData.avatar || undefined,
+          specialty: userData.specialty || undefined,
+          credential: userData.credential || undefined,
+          yearsExp: userData.yearsExp || undefined,
+          rating: userData.rating || 0
+        });
+      } else {
+        router.replace("/home");
+      }
+
+    } catch (error: any) {
+      alert("Error al iniciar sesión: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <SafeAreaView edges={["top","bottom"]} style={styles.safe}>
+    <SafeAreaView edges={["top", "bottom"]} style={styles.safe}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}>
+        style={styles.container}
+      >
         <View style={styles.brand}>
-          <Text variant="headlineLarge" style={{ fontWeight: '700', color: '#0b5fff' }}>
+          <Text variant="headlineLarge" style={styles.brandTitle}>
             Arreglalo
           </Text>
-          <Text variant="bodyMedium" style={{ marginTop: 4, color: '#6b7280' }}>
+          <Text variant="bodyMedium" style={styles.brandSubtitle}>
             Expertos al servicio
           </Text>
         </View>
 
         <View style={styles.card}>
-          <Text variant="titleLarge" style={{ marginBottom: 20, fontWeight: '600' }}>
+          <Text variant="titleLarge" style={styles.cardTitle}>
             Iniciar sesión
           </Text>
 
           <TextInput
-            label="Usuario o correo"
+            label="Correo electrónico"
             value={user}
             onChangeText={setUser}
             autoCapitalize="none"
@@ -115,13 +137,19 @@ const handleLogin = async () => {
             label="Contraseña"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
+            secureTextEntry={!showPassword}
+            right={
+              <TextInput.Icon
+                icon={showPassword ? "eye-off" : "eye"}
+                onPress={() => setShowPassword(!showPassword)}
+              />
+            }
             mode="outlined"
             style={styles.input}
           />
 
-          <Button 
-            mode="contained" 
+          <Button
+            mode="contained"
             onPress={handleLogin}
             loading={isLoading}
             disabled={isLoading}
@@ -130,15 +158,17 @@ const handleLogin = async () => {
             Ingresar
           </Button>
 
-          <Button 
-            mode="text" 
+          <Button
+            mode="text"
             onPress={() => handleNavigate('/forgot-password')}
-            style={{ marginTop: 12 }}
+            style={styles.forgotButton}
           >
             ¿Olvidaste tu contraseña?
           </Button>
 
-          <Text variant="bodyMedium" style={styles.or}>O iniciar con</Text>
+          <Text variant="bodyMedium" style={styles.or}>
+            O iniciar con
+          </Text>
 
           <View style={styles.socialRow}>
             <Button
@@ -152,18 +182,18 @@ const handleLogin = async () => {
             <Button
               mode="contained"
               onPress={() => alert('Facebook login aún no implementado')}
-              style={[styles.socialBtn, { backgroundColor: '#1877f2' }]}
+              style={[styles.socialBtn, styles.facebookBtn]}
             >
               Facebook
             </Button>
           </View>
 
           <View style={styles.row}>
-            <Text variant="bodySmall" style={{ color: '#6b7280' }}>
+            <Text variant="bodySmall" style={styles.registerText}>
               ¿No tienes cuenta?
             </Text>
-            <Button 
-              mode="text" 
+            <Button
+              mode="text"
               onPress={() => handleNavigate('/register')}
               compact
             >
@@ -177,12 +207,27 @@ const handleLogin = async () => {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f6f8fb' },
-
-  container: { flex: 1, padding: 20, justifyContent: 'center' },
-
-  brand: { alignItems: 'center', marginBottom: 20 },
-
+  safe: {
+    flex: 1,
+    backgroundColor: '#f6f8fb',
+  },
+  container: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+  },
+  brand: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  brandTitle: {
+    fontWeight: '700',
+    color: '#0b5fff',
+  },
+  brandSubtitle: {
+    marginTop: 4,
+    color: '#6b7280',
+  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -192,23 +237,43 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 4,
   },
-
+  cardTitle: {
+    marginBottom: 20,
+    fontWeight: '600',
+  },
   input: {
     marginBottom: 12,
   },
-
   primaryButton: {
     marginTop: 4,
     paddingVertical: 6,
   },
-
-  or: { textAlign: 'center', marginVertical: 12, color: '#6b7280' },
-
-  socialRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-
+  forgotButton: {
+    marginTop: 12,
+  },
+  or: {
+    textAlign: 'center',
+    marginVertical: 12,
+    color: '#6b7280',
+  },
+  socialRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   socialBtn: {
     flex: 1,
   },
-
-  row: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 14 },
+  facebookBtn: {
+    backgroundColor: '#1877f2',
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  registerText: {
+    color: '#6b7280',
+  },
 });
