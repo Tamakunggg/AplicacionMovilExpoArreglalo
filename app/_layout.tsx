@@ -240,8 +240,7 @@ export default function RootLayout() {
             <Slot />
           </View>
 
-          <SafeAreaView edges={['bottom']} style={styles.navSafeArea} pointerEvents="box-none">
-            <View style={styles.navWrapper} pointerEvents="box-none">
+          <SafeAreaView edges={['bottom']} style={styles.navSafeArea}>
               <View style={styles.nav}>
                 <NavButton
                   label="Contratar"
@@ -264,7 +263,6 @@ export default function RootLayout() {
                   onPress={() => goToRoute('/perfil')}
                 />
               </View>
-            </View>
           </SafeAreaView>
 
           <AppDrawer
@@ -436,21 +434,14 @@ const styles = StyleSheet.create({
   },
   navSafeArea: {
     backgroundColor: '#fff',
-  },
-  navWrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#ccc',
   },
   nav: {
     height: 60,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#ccc',
     backgroundColor: '#fff',
     width: '100%',
   },
