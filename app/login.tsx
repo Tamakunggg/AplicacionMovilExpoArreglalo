@@ -166,28 +166,6 @@ export default function Login({ onLogin, onNavigate }: Props) {
             ¿Olvidaste tu contraseña?
           </Button>
 
-          <Text variant="bodyMedium" style={styles.or}>
-            O iniciar con
-          </Text>
-
-          <View style={styles.socialRow}>
-            <Button
-              mode="outlined"
-              onPress={() => alert('Google login aún no implementado')}
-              style={styles.socialBtn}
-            >
-              Google
-            </Button>
-
-            <Button
-              mode="contained"
-              onPress={() => alert('Facebook login aún no implementado')}
-              style={[styles.socialBtn, styles.facebookBtn]}
-            >
-              Facebook
-            </Button>
-          </View>
-
           <View style={styles.row}>
             <Text variant="bodySmall" style={styles.registerText}>
               ¿No tienes cuenta?
