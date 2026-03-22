@@ -1,32 +1,38 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
-  collection,
-  doc,
-  getDocs,
-  query,
-  updateDoc,
-  where,
+    collection,
+    doc,
+    getDocs,
+    query,
+    updateDoc,
+    where,
 } from 'firebase/firestore';
 import React, { useCallback, useContext, useMemo, useState } from 'react';
 import {
-  Alert,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
+    Alert,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    View,
 } from 'react-native';
 import {
-  ActivityIndicator,
-  Button,
-  Card,
-  Chip,
-  Divider,
-  Text,
+    ActivityIndicator,
+    Button,
+    Card,
+    Chip,
+    Divider,
+    Text,
+    TextInput,
 } from 'react-native-paper';
 import { db } from '../firebaseConfig';
 import { getOrCreateChat } from '../services/chat';
-import { updateContractStatus } from '../services/contractsService';
+import { 
+  updateContractStatus,
+  submitCounterProposal,
+  acceptProfessionalQuote,
+} from '../services/contractsService';
 import { AuthContext } from './auth-context';
 
 type EstadoTrabajo =
@@ -71,6 +77,11 @@ export default function TrabajosProfesional() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [showCounterModal, setShowCounterModal] = useState(false);
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
+  const [selectedSolicitudId, setSelectedSolicitudId] = useState<string | null>(null);
+  const [counterPrice, setCounterPrice] = useState('');
+  const [counterReason, setCounterReason] = useState('');
 
   const cargarSolicitudes = useCallback(async () => {
     try {
@@ -202,10 +213,86 @@ export default function TrabajosProfesional() {
     }
   };
 
+  const abrirModalContrapropuesta = (contractId: string, solicitudId: string, presupuestoActual: number | string) => {
+    setSelectedContractId(contractId);
+    setSelectedSolicitudId(solicitudId);
+    setCounterPrice(String(presupuestoActual));
+    setCounterReason('');
+    setShowCounterModal(true);
+  };
+
+  const enviarContrapropuesta = async () => {
+    if (!selectedContractId) return;
+
+    const nuevoPrecio = Number(counterPrice);
+    if (isNaN(nuevoPrecio) || nuevoPrecio <= 0) {
+      Alert.alert('Error', 'El precio debe ser un número mayor a 0.');
+      return;
+    }
+
+    try {
+      setUpdatingId(selectedContractId);
+      await submitCounterProposal(selectedContractId, nuevoPrecio, counterReason, selectedSolicitudId || undefined);
+      
+      // Actualizar estado local
+      setSolicitudes((prev) =>
+        prev.map((s) =>
+          s.id === selectedSolicitudId 
+            ? { ...s, status: 'presupuesto_contrapropuesto', counterProposedPrice: nuevoPrecio } 
+            : s
+        )
+      );
+
+      setShowCounterModal(false);
+      setCounterPrice('');
+      setCounterReason('');
+      setSelectedContractId(null);
+      setSelectedSolicitudId(null);
+
+      Alert.alert(
+        '✓ Contrapropuesta Enviada',
+        `Tu nueva propuesta de $${nuevoPrecio} ha sido enviada al cliente.`
+      );
+    } catch (error: any) {
+      console.error('Error al enviar contrapropuesta:', error);
+      Alert.alert('Error', error?.message || 'No se pudo enviar la contrapropuesta.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const aceptarPresupuesto = async (contractId: string, solicitudId: string) => {
+    try {
+      setUpdatingId(solicitudId);
+      await acceptProfessionalQuote(contractId, solicitudId);
+      
+      setSolicitudes((prev) =>
+        prev.map((s) =>
+          s.id === solicitudId 
+            ? { ...s, status: 'presupuesto_aceptado' } 
+            : s
+        )
+      );
+
+      Alert.alert('✓ Presupuesto Aceptado', 'Ya puedes iniciar el trabajo cuando esté listo.');
+    } catch (error: any) {
+      console.error('Error al aceptar presupuesto:', error);
+      Alert.alert('Error', error?.message || 'No se pudo aceptar el presupuesto.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const getEstadoLabel = (estado?: string) => {
     switch (estado) {
       case 'solicitud_enviada':
-        return 'Solicitud enviada';
+        return 'Solicitud recibida';
+      case 'presupuesto_propuesto':
+        return 'Presupuesto pendiente';
+      case 'presupuesto_contrapropuesto':
+        return 'Contrapropuesta enviada';
+      case 'presupuesto_aceptado':
+        return 'Presupuesto aceptado';
       case 'trabajo_activo':
         return 'Trabajo activo';
       case 'trabajo_realizado':
@@ -221,6 +308,12 @@ export default function TrabajosProfesional() {
     switch (estado) {
       case 'solicitud_enviada':
         return { bg: '#f8edc4', text: '#8a6d1f' };
+      case 'presupuesto_propuesto':
+        return { bg: '#fce7f3', text: '#be185d' };
+      case 'presupuesto_contrapropuesto':
+        return { bg: '#f3e8ff', text: '#7e22ce' };
+      case 'presupuesto_aceptado':
+        return { bg: '#d1fae5', text: '#065f46' };
       case 'trabajo_activo':
         return { bg: '#dbeafe', text: '#1d4ed8' };
       case 'trabajo_realizado':
@@ -263,6 +356,9 @@ export default function TrabajosProfesional() {
       solicitudes.filter(
         (s) =>
           s.status === 'solicitud_enviada' ||
+          s.status === 'presupuesto_propuesto' ||
+          s.status === 'presupuesto_contrapropuesto' ||
+          s.status === 'presupuesto_aceptado' ||
           s.status === 'trabajo_activo' ||
           s.status === 'trabajo_realizado'
       ),
@@ -284,6 +380,7 @@ export default function TrabajosProfesional() {
   }
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
@@ -434,9 +531,9 @@ export default function TrabajosProfesional() {
 
                   {estado === 'trabajo_realizado' && !yaPago && (
                     <View style={styles.noticeBoxPending}>
-                      <Text style={styles.noticeTitlePending}>Esperando pago</Text>
+                      <Text style={styles.noticeTitlePending}>⏳ Pago No Recibido</Text>
                       <Text style={styles.noticeTextPending}>
-                        El trabajo ya fue marcado como realizado. Falta que el cliente complete el pago.
+                        El trabajo fue marcado como realizado. El cliente aún no ha completado el pago.
                       </Text>
                     </View>
                   )}
@@ -450,7 +547,7 @@ export default function TrabajosProfesional() {
                         size={20}
                         color="#6f42c1"
                       />
-                      <Text style={styles.timelineText}>Solicitud enviada</Text>
+                      <Text style={styles.timelineText}>Solicitud recibida</Text>
                     </View>
 
                     <View style={styles.timelineItem}>
@@ -502,6 +599,50 @@ export default function TrabajosProfesional() {
                     </Button>
 
                     {estado === 'solicitud_enviada' && (
+                      <>
+                        <Button
+                          mode="contained"
+                          icon="check-circle-outline"
+                          style={styles.primaryButton}
+                          contentStyle={styles.buttonContent}
+                          onPress={() => aceptarPresupuesto(solicitud.contractId || '', solicitud.id)}
+                          loading={isUpdating === solicitud.id}
+                          disabled={updatingId !== null}
+                        >
+                          Aceptar
+                        </Button>
+                        <Button
+                          mode="outlined"
+                          icon="pencil-outline"
+                          style={styles.secondaryButton}
+                          contentStyle={styles.buttonContent}
+                          onPress={() =>
+                            abrirModalContrapropuesta(
+                              solicitud.contractId || '',
+                              solicitud.id,
+                              getPresupuesto(solicitud)
+                            )
+                          }
+                          disabled={updatingId !== null}
+                        >
+                          Contraproponer
+                        </Button>
+                      </>
+                    )}
+
+                    {estado === 'presupuesto_contrapropuesto' && (
+                      <Button
+                        mode="outlined"
+                        disabled
+                        icon="check-outline"
+                        style={styles.processingButton}
+                        contentStyle={styles.buttonContent}
+                      >
+                        Esperando respuesta del cliente
+                      </Button>
+                    )}
+
+                    {estado === 'presupuesto_aceptado' && (
                       <Button
                         mode="contained"
                         icon="briefcase-check-outline"
@@ -602,6 +743,67 @@ export default function TrabajosProfesional() {
         </View>
       )}
     </ScrollView>
+
+    {/* Modal para Contrapropuesta */}
+    <Modal visible={showCounterModal} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <Card style={styles.modalContent}>
+          <Card.Content>
+            <Text variant="titleLarge" style={styles.modalTitle}>
+              💰 Proponer Nuevo Presupuesto
+            </Text>
+            <Divider style={styles.modalDivider} />
+
+            <Text style={styles.modalLabel}>Nuevo precio</Text>
+            <TextInput
+              label="Precio"
+              value={counterPrice}
+              onChangeText={setCounterPrice}
+              mode="outlined"
+              keyboardType="numeric"
+              placeholder="0"
+              style={styles.modalInput}
+            />
+
+            <Text style={styles.modalLabel}>Razón de la contrapropuesta (opcional)</Text>
+            <TextInput
+              label="Razón"
+              value={counterReason}
+              onChangeText={setCounterReason}
+              mode="outlined"
+              multiline
+              numberOfLines={3}
+              placeholder="Ej: Requiere más materiales..."
+              style={[styles.modalInput, { minHeight: 80 }]}
+            />
+
+            <View style={styles.modalButtons}>
+              <Button
+                mode="outlined"
+                onPress={() => {
+                  setShowCounterModal(false);
+                  setCounterPrice('');
+                  setCounterReason('');
+                }}
+                style={styles.modalButtonAux}
+              >
+                Cancelar
+              </Button>
+              <Button
+                mode="contained"
+                onPress={enviarContrapropuesta}
+                loading={updatingId === selectedContractId}
+                disabled={updatingId !== null}
+                style={styles.modalButtonPrimary}
+              >
+                Enviar Propuesta
+              </Button>
+            </View>
+          </Card.Content>
+        </Card>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -715,21 +917,23 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   noticeBoxPending: {
-    backgroundColor: '#fffbeb',
+    backgroundColor: '#fef2f2',
     borderRadius: 16,
-    padding: 14,
+    padding: 16,
     marginTop: 14,
-    borderWidth: 1,
-    borderColor: '#fde68a',
+    borderWidth: 2,
+    borderColor: '#fca5a5',
   },
   noticeTitlePending: {
-    fontWeight: '800',
-    color: '#92400e',
-    marginBottom: 4,
+    fontWeight: '900',
+    color: '#dc2626',
+    marginBottom: 6,
+    fontSize: 16,
   },
   noticeTextPending: {
-    color: '#92400e',
-    lineHeight: 20,
+    color: '#b91c1c',
+    lineHeight: 22,
+    fontWeight: '500',
   },
   timelineBox: {
     backgroundColor: '#f3eefb',
@@ -784,5 +988,60 @@ const styles = StyleSheet.create({
   buttonContent: {
     paddingHorizontal: 12,
     paddingVertical: 6,
+  },
+  secondaryButton: {
+    borderRadius: 16,
+    borderColor: '#7e22ce',
+    minWidth: 140,
+    flex: 1,
+  },
+  processingButton: {
+    borderRadius: 16,
+    minWidth: 140,
+    flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 24,
+    backgroundColor: '#fff',
+  },
+  modalTitle: {
+    fontWeight: '800',
+    color: '#2f1f63',
+    marginBottom: 8,
+  },
+  modalDivider: {
+    marginVertical: 12,
+  },
+  modalLabel: {
+    fontWeight: '600',
+    color: '#4b5563',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  modalInput: {
+    backgroundColor: '#f9fafb',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 18,
+  },
+  modalButtonAux: {
+    flex: 1,
+    borderRadius: 12,
+  },
+  modalButtonPrimary: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: '#7e22ce',
   },
 });
