@@ -26,10 +26,18 @@ import {
 } from 'react-native-paper';
 import { db } from '../firebaseConfig';
 import { getOrCreateChat } from '../services/chat';
+import {
+  acceptCounterProposal,
+  rejectCounterProposal,
+  updatePaymentStatusForService,
+} from '../services/contractsService';
 import { AuthContext } from './auth-context';
 
 type EstadoTrabajo =
   | 'solicitud_enviada'
+  | 'presupuesto_propuesto'
+  | 'presupuesto_contrapropuesto'
+  | 'presupuesto_aceptado'
   | 'trabajo_activo'
   | 'trabajo_realizado'
   | 'cancelado';
@@ -55,6 +63,8 @@ type SolicitudServicio = {
   status?: EstadoTrabajo | string;
   contractId?: string;
   paymentStatus?: 'pendiente' | 'pagado' | string;
+  counterProposedPrice?: number;
+  counterProposalReason?: string;
   createdAt?: any;
   date?: string;
   fecha?: string;
@@ -70,6 +80,7 @@ export default function TrabajosCliente() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [pagandoId, setPagandoId] = useState<string | null>(null);
 
   const cargarSolicitudes = useCallback(async () => {
     try {
@@ -197,6 +208,114 @@ export default function TrabajosCliente() {
     });
   };
 
+  const procesarPago = (solicitud: SolicitudServicio) => {
+    const presupuesto = getPresupuesto(solicitud);
+    const titulo = getTitulo(solicitud);
+
+    Alert.alert(
+      '💳 Confirmar Pago',
+      `¿Deseas pagar $${presupuesto} por "${titulo}"?\n\nEsta acción marcará el servicio como pagado.`,
+      [
+        { 
+          text: 'Cancelar', 
+          style: 'cancel',
+          onPress: () => setPagandoId(null)
+        },
+        {
+          text: 'Confirmar Pago',
+          style: 'default',
+          onPress: async () => {
+            try {
+              setPagandoId(solicitud.id);
+              await updatePaymentStatusForService(solicitud.id, 'pagado');
+              
+              setSolicitudes((prev) =>
+                prev.map((s) =>
+                  s.id === solicitud.id 
+                    ? { ...s, paymentStatus: 'pagado' } 
+                    : s
+                )
+              );
+
+              Alert.alert(
+                '✅ ¡Pago Realizado!',
+                'El pago ha sido registrado exitosamente. El profesionista recibirá la confirmación.'
+              );
+            } catch (error) {
+              console.error('Error al procesar pago:', error);
+              Alert.alert('Error', 'No se pudo procesar el pago. Intenta nuevamente.');
+            } finally {
+              setPagandoId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const aceptarContrapropuesta = async (contractId: string, nuevoPrecio: number) => {
+    try {
+      setUpdatingId(contractId);
+      await acceptCounterProposal(contractId);
+      
+      setSolicitudes((prev) =>
+        prev.map((s) =>
+          s.id === contractId 
+            ? { ...s, status: 'presupuesto_aceptado', budget: nuevoPrecio } 
+            : s
+        )
+      );
+
+      Alert.alert(
+        '✓ Presupuesto Aceptado',
+        `Has aceptado el nuevo presupuesto de $${nuevoPrecio}. El profesionista puede iniciar cuando esté listo.`
+      );
+    } catch (error: any) {
+      console.error('Error al aceptar contrapropuesta:', error);
+      Alert.alert('Error', error?.message || 'No se pudo aceptar la contrapropuesta.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const rechazarContrapropuesta = async (contractId: string) => {
+    Alert.alert(
+      'Rechazar Contrapropuesta',
+      '¿Deseas rechazar esta propuesta? Podrás negociar nuevamente.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Rechazar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setUpdatingId(contractId);
+              await rejectCounterProposal(contractId);
+              
+              setSolicitudes((prev) =>
+                prev.map((s) =>
+                  s.id === contractId 
+                    ? { ...s, status: 'presupuesto_propuesto' } 
+                    : s
+                )
+              );
+
+              Alert.alert(
+                '✓ Contrapropuesta Rechazada',
+                'Vuelve al estado anterior. Podrán renegociar a través del chat.'
+              );
+            } catch (error: any) {
+              console.error('Error al rechazar contrapropuesta:', error);
+              Alert.alert('Error', error?.message || 'No se pudo rechazar la contrapropuesta.');
+            } finally {
+              setUpdatingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const getEstadoLabel = (estado?: string) => {
     switch (estado) {
       case 'solicitud_enviada':
@@ -262,6 +381,9 @@ export default function TrabajosCliente() {
       solicitudes.filter(
         (s) =>
           s.status === 'solicitud_enviada' ||
+          s.status === 'presupuesto_propuesto' ||
+          s.status === 'presupuesto_contrapropuesto' ||
+          s.status === 'presupuesto_aceptado' ||
           s.status === 'trabajo_activo' ||
           s.status === 'trabajo_realizado'
       ),
@@ -408,13 +530,116 @@ export default function TrabajosCliente() {
                     </View>
                   )}
 
+                  {estado === 'presupuesto_propuesto' && (
+                    <View style={styles.presupuestoBox}>
+                      <MaterialCommunityIcons
+                        name="file-document-outline"
+                        size={20}
+                        color="#0369a1"
+                      />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.presupuestoTitle}>Presupuesto pendiente de confirmación</Text>
+                        <Text style={styles.presupuestoSubtitle}>
+                          El profesionista revisó tu solicitud. Espera su respuesta.
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {estado === 'presupuesto_contrapropuesto' && (
+                    <Card style={styles.contraProuestaBox}>
+                      <Card.Content>
+                        <Text style={styles.contraProuestaTitle}>💰 Nueva Propuesta de Presupuesto</Text>
+                        <Divider style={{ marginVertical: 12 }} />
+                        <View style={{ marginBottom: 12 }}>
+                          <Text style={styles.contraProuestaPriceLabel}>Presupuesto original:</Text>
+                          <Text style={styles.contraProuestaPriceOld}>${getPresupuesto(solicitud)}</Text>
+                        </View>
+                        <View style={{ marginBottom: 14 }}>
+                          <Text style={styles.contraProuestaPriceLabel}>Nueva propuesta:</Text>
+                          <Text style={styles.contraProuestaPriceNew}>
+                            ${solicitud.counterProposedPrice || 'No especificado'}
+                          </Text>
+                        </View>
+                        <View style={styles.contraProuestaButtons}>
+                          <Button
+                            mode="contained"
+                            icon="check-circle-outline"
+                            style={styles.acceptButton}
+                            contentStyle={styles.buttonContentSmall}
+                            onPress={() =>
+                              aceptarContrapropuesta(
+                                solicitud.contractId || '',
+                                solicitud.counterProposedPrice || 0
+                              )
+                            }
+                            loading={updatingId === solicitud.id}
+                            disabled={updatingId !== null}
+                          >
+                            Aceptar
+                          </Button>
+                          <Button
+                            mode="outlined"
+                            icon="close-circle-outline"
+                            style={styles.rejectButton}
+                            contentStyle={styles.buttonContentSmall}
+                            labelStyle={styles.rejectLabel}
+                            onPress={() => rechazarContrapropuesta(solicitud.contractId || '')}
+                            disabled={updatingId !== null}
+                          >
+                            Rechazar
+                          </Button>
+                        </View>
+                      </Card.Content>
+                    </Card>
+                  )}
+
+                  {estado === 'presupuesto_aceptado' && (
+                    <View style={styles.presupuestoAceptadoBox}>
+                      <MaterialCommunityIcons
+                        name="check-circle"
+                        size={20}
+                        color="#059669"
+                      />
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={styles.presupuestoAceptadoTitle}>✓ Presupuesto confirmado</Text>
+                        <Text style={styles.presupuestoAceptadoSubtitle}>
+                          Presupuesto: ${getPresupuesto(solicitud)}. El profesionista puede iniciar cuando esté listo.
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
                   {estado === 'trabajo_realizado' && (
                     <View style={styles.noticeBox}>
                       <Text style={styles.noticeTitle}>Trabajo terminado</Text>
                       <Text style={styles.noticeText}>
-                        El profesionista marcó este servicio como realizado.
-                        Revisa el detalle para continuar con pago y reseña.
+                        El técnico marcó este servicio como realizado.
+                        Revisa y continúa con el pago.
                       </Text>
+                      {solicitud.paymentStatus === 'pendiente' && (
+                        <Button
+                          mode="contained"
+                          icon="credit-card"
+                          style={styles.noticePayButton}
+                          contentStyle={styles.noticePayButtonContent}
+                          onPress={() => procesarPago(solicitud)}
+                          loading={pagandoId === solicitud.id}
+                          disabled={pagandoId !== null}
+                        >
+                          Pagar Ahora
+                        </Button>
+                      )}
+                      {solicitud.paymentStatus === 'pagado' && (
+                        <View style={styles.paidBadge}>
+                          <MaterialCommunityIcons
+                            name="check-circle"
+                            size={16}
+                            color="#10b981"
+                          />
+                          <Text style={styles.paidBadgeText}>Pago realizado</Text>
+                        </View>
+                      )}
                     </View>
                   )}
 
@@ -499,8 +724,8 @@ export default function TrabajosCliente() {
                         contentStyle={styles.buttonContent}
                         labelStyle={styles.cancelLabel}
                         onPress={() => confirmarCancelar(solicitud.id)}
-                        loading={isUpdating}
-                        disabled={isUpdating}
+                        loading={updatingId === solicitud.id}
+                        disabled={updatingId === solicitud.id}
                       >
                         Cancelar
                       </Button>
@@ -656,6 +881,33 @@ const styles = StyleSheet.create({
     color: '#166534',
     lineHeight: 20,
   },
+  noticePayButton: {
+    borderRadius: 8,
+    backgroundColor: '#059669',
+    marginTop: 12,
+    alignSelf: 'center',
+    maxWidth: 160,
+  },
+  noticePayButtonContent: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  paidBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#d1fae5',
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  paidBadgeText: {
+    color: '#10b981',
+    marginLeft: 6,
+    fontWeight: '600',
+    fontSize: 13,
+  },
   timelineBox: {
     backgroundColor: '#f8f5ff',
     borderRadius: 14,
@@ -703,5 +955,95 @@ const styles = StyleSheet.create({
   buttonContent: {
     paddingHorizontal: 10,
     paddingVertical: 4,
+  },
+  presupuestoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#eff6ff',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  presupuestoTitle: {
+    fontWeight: '700',
+    color: '#0369a1',
+    marginBottom: 4,
+  },
+  presupuestoSubtitle: {
+    color: '#0c4a6e',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  contraProuestaBox: {
+    marginTop: 12,
+    borderRadius: 14,
+    backgroundColor: '#fff5f5',
+    borderWidth: 2,
+    borderColor: '#fecaca',
+    elevation: 2,
+  },
+  contraProuestaTitle: {
+    fontWeight: '800',
+    color: '#dc2626',
+    fontSize: 15,
+  },
+  contraProuestaPriceLabel: {
+    fontWeight: '600',
+    color: '#7f1d1d',
+    fontSize: 12,
+  },
+  contraProuestaPriceOld: {
+    fontSize: 14,
+    color: '#991b1b',
+    textDecorationLine: 'line-through',
+    marginBottom: 4,
+  },
+  contraProuestaPriceNew: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#dc2626',
+  },
+  contraProuestaButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  acceptButton: {
+    flex: 1,
+    borderRadius: 10,
+    backgroundColor: '#059669',
+  },
+  rejectButton: {
+    flex: 1,
+    borderRadius: 10,
+    borderColor: '#dc2626',
+  },
+  rejectLabel: {
+    color: '#dc2626',
+  },
+  buttonContentSmall: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  presupuestoAceptadoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#ecfdf5',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  presupuestoAceptadoTitle: {
+    fontWeight: '700',
+    color: '#065f46',
+    marginBottom: 4,
+  },
+  presupuestoAceptadoSubtitle: {
+    color: '#047857',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

@@ -1,20 +1,22 @@
 import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  serverTimestamp,
-  updateDoc,
-  where,
+    addDoc,
+    collection,
+    doc,
+    getDoc,
+    getDocs,
+    query,
+    serverTimestamp,
+    updateDoc,
+    where,
 } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from '../firebaseConfig';
 
 export type ContractStatus =
   | 'pendiente'
-  | 'aceptado'
+  | 'presupuesto_propuesto'
+  | 'presupuesto_contrapropuesto'
+  | 'presupuesto_aceptado'
   | 'en_proceso'
   | 'terminado'
   | 'pagado'
@@ -38,6 +40,8 @@ export type ContractItem = {
   paymentStatus: PaymentStatus;
   reviewEnabled: boolean;
   evidence: string[];
+  counterProposedPrice?: number;
+  counterProposalReason?: string;
   createdAt?: any;
   updatedAt?: any;
 };
@@ -76,6 +80,8 @@ function mapContract(docId: string, data: any): ContractItem {
     paymentStatus: (data?.paymentStatus || 'pendiente') as PaymentStatus,
     reviewEnabled: Boolean(data?.reviewEnabled),
     evidence: Array.isArray(data?.evidence) ? data.evidence : [],
+    counterProposedPrice: data?.counterProposedPrice,
+    counterProposalReason: data?.counterProposalReason,
     createdAt: data?.createdAt,
     updatedAt: data?.updatedAt,
   };
@@ -306,4 +312,165 @@ export async function uploadContractEvidence(contractId: string, uri: string) {
   });
 
   return url;
+}
+
+export async function updatePaymentStatusForService(
+  serviceId: string,
+  paymentStatus: PaymentStatus
+) {
+  const cleanId = normalizeText(serviceId);
+
+  if (!cleanId) {
+    throw new Error('Falta el id del servicio.');
+  }
+
+  await updateDoc(doc(db, 'solicitudesServicio', cleanId), {
+    paymentStatus,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function submitCounterProposal(
+  contractId: string,
+  newPrice: number,
+  reason: string,
+  solicitudId?: string
+) {
+  const cleanId = normalizeText(contractId);
+
+  if (!cleanId) {
+    throw new Error('Falta el id del contrato.');
+  }
+
+  if (isNaN(newPrice) || newPrice <= 0) {
+    throw new Error('El precio debe ser mayor a 0.');
+  }
+
+  const contract = await getContractById(cleanId);
+
+  if (!contract) {
+    throw new Error('No se encontró el contrato.');
+  }
+
+  await updateDoc(doc(db, 'contratos', cleanId), {
+    status: 'presupuesto_contrapropuesto',
+    counterProposedPrice: newPrice,
+    counterProposalReason: normalizeText(reason),
+    updatedAt: serverTimestamp(),
+  });
+
+  // También actualizar la solicitud si se proporciona el ID
+  if (solicitudId) {
+    const cleanSolicitudId = normalizeText(solicitudId);
+    if (cleanSolicitudId) {
+      await updateDoc(doc(db, 'solicitudesServicio', cleanSolicitudId), {
+        status: 'presupuesto_contrapropuesto',
+        counterProposedPrice: newPrice,
+        counterProposalReason: normalizeText(reason),
+        updatedAt: serverTimestamp(),
+      });
+    }
+  }
+}
+
+export async function acceptCounterProposal(contractId: string, solicitudId?: string) {
+  const cleanId = normalizeText(contractId);
+
+  if (!cleanId) {
+    throw new Error('Falta el id del contrato.');
+  }
+
+  const contract = await getContractById(cleanId);
+
+  if (!contract) {
+    throw new Error('No se encontró el contrato.');
+  }
+
+  if (!contract.counterProposedPrice) {
+    throw new Error('No hay una contrapropuesta para aceptar.');
+  }
+
+  const updateData = {
+    status: 'presupuesto_aceptado',
+    agreedPrice: contract.counterProposedPrice,
+    counterProposedPrice: undefined,
+    counterProposalReason: undefined,
+    updatedAt: serverTimestamp(),
+  };
+
+  await updateDoc(doc(db, 'contratos', cleanId), updateData);
+
+  // Update solicitud if provided for consistency across collections
+  if (solicitudId) {
+    const solicitudCleanId = normalizeText(solicitudId);
+    if (solicitudCleanId) {
+      await updateDoc(doc(db, 'solicitudesServicio', solicitudCleanId), updateData).catch(
+        (error) => console.warn('Could not update solicitud:', error)
+      );
+    }
+  }
+}
+
+export async function rejectCounterProposal(contractId: string, solicitudId?: string) {
+  const cleanId = normalizeText(contractId);
+
+  if (!cleanId) {
+    throw new Error('Falta el id del contrato.');
+  }
+
+  const contract = await getContractById(cleanId);
+
+  if (!contract) {
+    throw new Error('No se encontró el contrato.');
+  }
+
+  const updateData = {
+    status: 'presupuesto_propuesto',
+    counterProposedPrice: undefined,
+    counterProposalReason: undefined,
+    updatedAt: serverTimestamp(),
+  };
+
+  await updateDoc(doc(db, 'contratos', cleanId), updateData);
+
+  // Update solicitud if provided for consistency across collections
+  if (solicitudId) {
+    const solicitudCleanId = normalizeText(solicitudId);
+    if (solicitudCleanId) {
+      await updateDoc(doc(db, 'solicitudesServicio', solicitudCleanId), updateData).catch(
+        (error) => console.warn('Could not update solicitud:', error)
+      );
+    }
+  }
+}
+
+export async function acceptProfessionalQuote(contractId: string, solicitudId?: string) {
+  const cleanId = normalizeText(contractId);
+
+  if (!cleanId) {
+    throw new Error('Falta el id del contrato.');
+  }
+
+  const contract = await getContractById(cleanId);
+
+  if (!contract) {
+    throw new Error('No se encontró el contrato.');
+  }
+
+  const updateData = {
+    status: 'presupuesto_aceptado',
+    updatedAt: serverTimestamp(),
+  };
+
+  await updateDoc(doc(db, 'contratos', cleanId), updateData);
+
+  // Update solicitud if provided for consistency across collections
+  if (solicitudId) {
+    const solicitudCleanId = normalizeText(solicitudId);
+    if (solicitudCleanId) {
+      await updateDoc(doc(db, 'solicitudesServicio', solicitudCleanId), updateData).catch(
+        (error) => console.warn('Could not update solicitud:', error)
+      );
+    }
+  }
 }
