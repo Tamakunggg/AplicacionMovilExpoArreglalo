@@ -5,7 +5,7 @@ import { StyleSheet } from 'react-native';
 export const styles = StyleSheet.create({
   container: { paddingBottom: 40, backgroundColor: '#f6f8fb' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { backgroundColor: '#fff', padding: 24, alignItems: 'center', paddingTop: 60, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  header: { backgroundColor: '#fff', padding: 24, alignItems: 'center', paddingTop: 24, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
   avatarWrap: { position: 'relative' },
   avatar: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#e6eefc' },
   avatarPlaceholder: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#0b5fff', justifyContent: 'center', alignItems: 'center' },

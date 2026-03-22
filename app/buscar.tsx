@@ -213,7 +213,7 @@ export default function Buscar() {
     : 'Mostrando todas las especialidades';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
@@ -253,7 +253,7 @@ export default function Buscar() {
             keyExtractor={(i) => i.id}
             style={styles.list}
             contentContainerStyle={
-              results.length === 0 ? styles.emptyList : { paddingBottom: 140 }
+              results.length === 0 ? styles.emptyList : { paddingBottom: 20 }
             }
             refreshControl={
               <RefreshControl

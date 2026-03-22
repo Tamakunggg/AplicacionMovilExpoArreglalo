@@ -208,7 +208,30 @@ export default function ContratoDetalleScreen() {
         status: 'trabajo_realizado',
       });
 
-      Alert.alert('Éxito', 'Pago registrado correctamente.');
+      Alert.alert(
+        '✅ ¡Pago Realizado!',
+        'El pago ha sido registrado exitosamente. Ahora puedes dejar una reseña para el profesionista.',
+        [
+          {
+            text: 'Dejar reseña',
+            onPress: () => {
+              if (contract) {
+                router.push({
+                  pathname: '/calificar',
+                  params: {
+                    contractId: contract.id,
+                    professionalId: contract.professionalId,
+                    clientId: contract.clientId,
+                    clientName: contract.clientName,
+                    serviceId: contract.id,
+                  },
+                });
+              }
+            }
+          },
+          { text: 'Más tarde', style: 'cancel' }
+        ]
+      );
       await cargarContrato();
     } catch (error: any) {
       console.error('Error registrando pago:', error);

@@ -28,6 +28,7 @@ import { db } from '../firebaseConfig';
 import { getOrCreateChat } from '../services/chat';
 import {
   acceptCounterProposal,
+  markContractAsPaid,
   rejectCounterProposal,
   updatePaymentStatusForService,
 } from '../services/contractsService';
@@ -227,6 +228,13 @@ export default function TrabajosCliente() {
           onPress: async () => {
             try {
               setPagandoId(solicitud.id);
+              
+              // 1. Marcar contrato como pagado (si existe)
+              if (solicitud.contractId) {
+                await markContractAsPaid(solicitud.contractId);
+              }
+              
+              // 2. Actualizar estado de la solicitud
               await updatePaymentStatusForService(solicitud.id, 'pagado');
               
               setSolicitudes((prev) =>
@@ -239,7 +247,25 @@ export default function TrabajosCliente() {
 
               Alert.alert(
                 '✅ ¡Pago Realizado!',
-                'El pago ha sido registrado exitosamente. El profesionista recibirá la confirmación.'
+                'El pago ha sido registrado exitosamente. Ahora puedes dejar una reseña para el profesionista.',
+                [
+                  {
+                    text: 'Dejar reseña',
+                    onPress: () => {
+                      router.push({
+                        pathname: '/calificar',
+                        params: {
+                          contractId: solicitud.contractId || '',
+                          professionalId: solicitud.professionalId || '',
+                          clientId: user?.id || '',
+                          clientName: user?.name || solicitud.clientName || 'Cliente',
+                          serviceId: solicitud.id,
+                        },
+                      });
+                    }
+                  },
+                  { text: 'Más tarde', style: 'cancel' }
+                ]
               );
             } catch (error) {
               console.error('Error al procesar pago:', error);
@@ -631,13 +657,36 @@ export default function TrabajosCliente() {
                         </Button>
                       )}
                       {solicitud.paymentStatus === 'pagado' && (
-                        <View style={styles.paidBadge}>
-                          <MaterialCommunityIcons
-                            name="check-circle"
-                            size={16}
-                            color="#10b981"
-                          />
-                          <Text style={styles.paidBadgeText}>Pago realizado</Text>
+                        <View style={{ gap: 8 }}>
+                          <View style={styles.paidBadge}>
+                            <MaterialCommunityIcons
+                              name="check-circle"
+                              size={16}
+                              color="#10b981"
+                            />
+                            <Text style={styles.paidBadgeText}>Pago realizado</Text>
+                          </View>
+                          
+                          <Button
+                            mode="outlined"
+                            icon="star-outline"
+                            onPress={() => {
+                              router.push({
+                                pathname: '/calificar',
+                                params: {
+                                  contractId: solicitud.contractId || '',
+                                  professionalId: solicitud.professionalId || '',
+                                  clientId: user?.id || '',
+                                  clientName: user?.name || solicitud.clientName || 'Cliente',
+                                  serviceId: solicitud.id,
+                                },
+                              });
+                            }}
+                            style={{ borderRadius: 10, borderColor: '#6f42c1' }}
+                            labelStyle={{ color: '#6f42c1' }}
+                          >
+                            Dejar reseña
+                          </Button>
                         </View>
                       )}
                     </View>
@@ -790,7 +839,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 110,
+    paddingBottom: 20,
   },
   centered: {
     flex: 1,

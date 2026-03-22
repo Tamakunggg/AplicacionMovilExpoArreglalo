@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { IconButton, Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { AuthContext } from './auth-context';
 
 import { collection, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore';
@@ -170,7 +170,7 @@ export default function Favoritos() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <View style={styles.safe}>
       <View style={styles.container}>
         <Text variant="headlineMedium" style={styles.title}>
           Mis Favoritos
@@ -266,7 +266,7 @@ export default function Favoritos() {
           />
         )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   list: { flex: 1 },
-  listContent: { paddingBottom: 100 },
+  listContent: { paddingBottom: 20 },
   emptyListContent: { flexGrow: 1, justifyContent: 'center' },
   emptyContainer: { alignItems: 'center', padding: 40 },
   empty: {
